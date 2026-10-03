@@ -6,8 +6,8 @@ export DEVELOPMENT_CODE_SIGN_IDENTITY="iPhone Distribution: Digital Fortress LLC
 export DISTRIBUTION_CODE_SIGN_IDENTITY="iPhone Distribution: Digital Fortress LLC (C67CF9S4VU)"
 export DEVELOPMENT_TEAM="C67CF9S4VU"
 
-export API_ID="8"
-export API_HASH="7245de8e747a0d6fbe11f7cc14fcc0bb"
+export API_ID="26000763"
+export API_HASH="74d99973fb6a389f1326b41bb7709b76"
 
 export BUNDLE_ID="ph.telegra.Telegraph"
 export APP_CENTER_ID="0"

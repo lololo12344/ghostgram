@@ -2,13 +2,18 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
 
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    runs-on: macos-13
+    # NOTE: runner must contain the Xcode version from versions.json.
+    # versions.json currently requires Xcode 26.2 -> use a recent macOS runner.
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v2
@@ -20,6 +25,29 @@ jobs:
         run: |
           XCODE_VERSION=$(cat versions.json | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["xcode"]);')
           sudo xcode-select -s /Applications/Xcode_$XCODE_VERSION.app/Contents/Developer
+
+      - name: Inject API credentials (from secrets)
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          p = "build-system/appstore-configuration.json"
+          with open(p, encoding="utf-8") as f:
+              d = json.load(f)
+          changed = []
+          for key, env in (("api_id", "API_ID"), ("api_hash", "API_HASH"), ("bundle_id", "BUNDLE_ID")):
+              val = os.environ.get(env)
+              if val:
+                  d[key] = val
+                  changed.append(key)
+          with open(p, "w", encoding="utf-8") as f:
+              json.dump(d, f, indent="\t", ensure_ascii=False)
+          print("Injected from secrets:", changed)
+          print("bundle_id =", d.get("bundle_id"), "| api_id set =", bool(d.get("api_id")))
+          PY
 
       - name: Create canonical source directory
         run: |
@@ -80,14 +108,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: build-${{ env.BUILD_NUMBER }}
-          release_name: Telegram ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
+          release_name: Build ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
           body: |
-            An unsigned build of Telegram for iOS ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})
+            Unsigned iOS build ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }}).
+            Install via AltStore / Sideloadly (see INSTALL.md).
           draft: false
           prerelease: false
 
       - name: Upload Release IPA
-        id: upload-release-ipa 
+        id: upload-release-ipa
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,7 +127,7 @@ jobs:
           asset_content_type: application/zip
 
       - name: Upload Release DSYM
-        id: upload-release-dsym 
+        id: upload-release-dsym
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

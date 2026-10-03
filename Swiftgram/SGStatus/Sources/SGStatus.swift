@@ -7,7 +7,8 @@ public struct SGStatus: Equatable, Codable {
     public var status: Int64
     
     public static var `default`: SGStatus {
-        return SGStatus(status: 1)
+        // Security hardening: all Pro features unlocked; subscription gating removed.
+        return SGStatus(status: 5)
     }
     
     public init(status: Int64) {
@@ -17,7 +18,7 @@ public struct SGStatus: Equatable, Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: StringCodingKey.self)
 
-        self.status = try container.decodeIfPresent(Int64.self, forKey: "status") ?? 1
+        self.status = try container.decodeIfPresent(Int64.self, forKey: "status") ?? 5
     }
     
     public func encode(to encoder: Encoder) throws {

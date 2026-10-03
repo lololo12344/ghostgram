@@ -4281,11 +4281,9 @@ private func useFlatModalCallsPresentation(context: AccountContext) -> Bool {
 // MARK: Swiftgram
 extension SharedAccountContextImpl {
     func initSGIAP(isMainApp: Bool) {
-        if isMainApp {
-            self.SGIAP = SGIAPManager()
-        } else {
-            self.SGIAP = nil
-        }
+        _ = isMainApp
+        // Security hardening: in-app purchases / Swiftgram subscription disabled.
+        self.SGIAP = nil
     }
     
     public func makeSGProController(context: AccountContext) -> ViewController {

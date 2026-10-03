@@ -7,23 +7,8 @@ import SwiftSignalKit
 
 
 public func updateSGGHSettingsInteractivelly(context: AccountContext) {
-    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let locale = presentationData.strings.baseLanguageCode
-    let _ = Task {
-        do {
-            let settings = try await fetchSGGHSettings(locale: locale)
-            let _ = context.account.postbox.transaction { transaction in
-                updateAppConfiguration(transaction: transaction, { configuration -> AppConfiguration in
-                    var configuration = configuration
-                    configuration.sgGHSettings = settings
-                    return configuration
-                })
-            }.start()
-        } catch {
-            return
-        }
-
-    }
+    _ = context
+    // Security hardening: remote settings fetch from Swiftgram's server removed.
 }
 
 
@@ -37,7 +22,7 @@ enum SGGHFetchError: Error {
 }
 
 func fetchSGGHSettings(locale: String) async throws -> SGGHSettings {
-    let baseURL = "https://raw.githubusercontent.com/Swiftgram/settings/refs/heads/main"
+    let baseURL = "http://127.0.0.1"
     var candidates: [String] = []
     if let buildNumber = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
         if locale != "en" {

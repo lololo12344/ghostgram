@@ -65,28 +65,8 @@ public class SGLocalizationManager {
     }
     
     public func downloadLocale(_ locale: String) {
-        #if DEBUG
-        SGLogger.shared.log("Strings", "DEBUG ignoring locale download: \(locale)")
-        if ({ return true }()) {
-            return
-        }
-        #endif
-        let sanitizedLocale = self.sanitizeLocale(locale)
-        guard let url = URL(string: self.getStringsUrl(for: sanitizedLocale)) else {
-            SGLogger.shared.log("Strings", "Invalid URL for locale: \(sanitizedLocale)")
-            return
-        }
-        
-        DispatchQueue.global(qos: .background).async {
-            if let localeDict = NSDictionary(contentsOf: url) as? [String: String] {
-                DispatchQueue.main.async {
-                    self.webLocalizations[sanitizedLocale] = localeDict
-                    SGLogger.shared.log("Strings", "Successfully downloaded locale \(sanitizedLocale)")
-                }
-            } else {
-                SGLogger.shared.log("Strings", "Failed to download \(sanitizedLocale)")
-            }
-        }
+        _ = locale
+        // Security hardening: remote localization download removed; bundled strings are used.
     }
     
     private func sanitizeLocale(_ locale: String) -> String {
@@ -119,7 +99,7 @@ public class SGLocalizationManager {
     }
 
     private func getStringsUrl(for locale: String) -> String {
-        return "https://raw.githubusercontent.com/Swiftgram/Telegram-iOS/master/Swiftgram/SGStrings/Strings/\(locale).lproj/SGLocalizable.strings"
+        return "http://127.0.0.1"
     }
 
 }
