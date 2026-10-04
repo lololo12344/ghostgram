@@ -118,22 +118,11 @@ jobs:
             --configuration=release_arm64 \
             --buildNumber="$BUILD_NUMBER" \
             --disableProvisioningProfiles \
-            --disablePushEntitlements
+            --disablePushEntitlements \
+            --outputBuildArtifactsPath="build/artifacts"
 
-          # collect ipa
-          OUTPUT_PATH="build/artifacts"
-          rm -rf "$OUTPUT_PATH"
-          mkdir -p "$OUTPUT_PATH"
-          for f in bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/Telegram.ipa; do
-            cp "$f" $OUTPUT_PATH/
-          done
-
-          # collect dsym
-          mkdir -p build/DSYMs
-          for f in bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/*.dSYM; do
-            cp -R "$f" build/DSYMs/
-          done
-          zip -r "./$OUTPUT_PATH/Telegram.DSYMs.zip" build/DSYMs 1>/dev/null
+          test -s build/artifacts/Telegram.ipa
+          test -s build/artifacts/Telegram.DSYMs.zip
 
       - name: Create Release
         id: create_release
