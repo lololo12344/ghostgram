@@ -769,7 +769,7 @@ def build_spm(bazel, arguments):
 
     bazel_command_line.invoke_spm_build()
 
-def add_codesigning_common_arguments(current_parser: argparse.ArgumentParser):
+def add_codesigning_common_arguments(current_parser: argparse.ArgumentParser, require_codesigning=True):
     configuration_group = current_parser.add_mutually_exclusive_group(required=True)
     configuration_group.add_argument(
         '--configurationPath',
@@ -780,7 +780,7 @@ def add_codesigning_common_arguments(current_parser: argparse.ArgumentParser):
         metavar='path'
     )
 
-    codesigning_group = current_parser.add_mutually_exclusive_group(required=True)
+    codesigning_group = current_parser.add_mutually_exclusive_group(required=require_codesigning)
     codesigning_group.add_argument(
         '--gitCodesigningRepository',
         help='''
@@ -831,8 +831,8 @@ def add_codesigning_common_arguments(current_parser: argparse.ArgumentParser):
     )
 
 
-def add_project_and_build_common_arguments(current_parser: argparse.ArgumentParser):
-    add_codesigning_common_arguments(current_parser=current_parser)
+def add_project_and_build_common_arguments(current_parser: argparse.ArgumentParser, require_codesigning=True):
+    add_codesigning_common_arguments(current_parser=current_parser, require_codesigning=require_codesigning)
 
 
 if __name__ == '__main__':
@@ -978,7 +978,7 @@ if __name__ == '__main__':
         help='Build number.',
         metavar='number'
     )
-    add_project_and_build_common_arguments(buildParser)
+    add_project_and_build_common_arguments(buildParser, require_codesigning=False)
     buildParser.add_argument(
         '--configuration',
         choices=[
