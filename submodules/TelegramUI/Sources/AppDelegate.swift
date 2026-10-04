@@ -3360,7 +3360,7 @@ extension AppDelegate {
                 let _ = (strongSelf.context.get()
                 |> take(1)
                 |> deliverOnMainQueue).start(next: { [weak strongSelf] context in
-                    guard let veryStrongSelf = strongSelf else {
+                    guard strongSelf != nil else {
                         SGLogger.shared.log("SGIAP", "Finishing transactions \(transactions.map({ $0.transactionIdentifier ?? "nil" }).joined(separator: ", "))")
                         let defaultPaymentQueue = SKPaymentQueue.default()
                         for transaction in transactions {
@@ -3368,7 +3368,7 @@ extension AppDelegate {
                         }
                         return
                     }
-                    guard let context = context else {
+                    guard context != nil else {
                         SGLogger.shared.log("SGIAP", "Empty app context (how?)")
                         
                         SGLogger.shared.log("SGIAP", "Finishing transactions \(transactions.map({ $0.transactionIdentifier ?? "nil" }).joined(separator: ", "))")
