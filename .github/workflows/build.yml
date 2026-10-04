@@ -38,11 +38,17 @@ jobs:
           missing = [name for name in required if not os.environ.get(name)]
           if missing:
               raise SystemExit("Missing required GitHub Actions secrets: " + ", ".join(missing))
+          api_id = os.environ["API_ID"].strip()
+          if not api_id.isdecimal():
+              raise SystemExit("API_ID must be the numeric ID from my.telegram.org; its value is not logged")
+          api_hash = os.environ["API_HASH"].strip()
+          if len(api_hash) != 32 or any(char not in "0123456789abcdefABCDEF" for char in api_hash):
+              raise SystemExit("API_HASH must be the 32-character hexadecimal hash from my.telegram.org; its value is not logged")
           with open(p, encoding="utf-8") as f:
               d = json.load(f)
           changed = []
           for key, env in (("api_id", "API_ID"), ("api_hash", "API_HASH")):
-              val = os.environ.get(env)
+              val = api_id if env == "API_ID" else api_hash
               if val:
                   d[key] = val
                   changed.append(key)
