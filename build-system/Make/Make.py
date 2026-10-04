@@ -502,13 +502,23 @@ def resolve_configuration(base_path, bazel_command_line: BazelCommandLine, argum
         shutil.rmtree(provisioning_path)
     os.makedirs(provisioning_path, exist_ok=True)
 
-    codesigning_data = resolve_codesigning(
-        arguments=arguments,
-        base_path=base_path,
-        build_configuration=build_configuration,
-        provisioning_profiles_path=provisioning_path,
-        additional_codesigning_output_path=additional_codesigning_output_path
-    )
+    disable_provisioning_profiles = getattr(arguments, 'disableProvisioningProfiles', False)
+    disable_push_entitlements = getattr(arguments, 'disablePushEntitlements', False)
+    if disable_provisioning_profiles and disable_push_entitlements:
+        codesigning_data = ResolvedCodesigningData(
+            aps_environment='',
+            use_xcode_managed_codesigning=False
+        )
+    else:
+        codesigning_data = resolve_codesigning(
+            arguments=arguments,
+            base_path=base_path,
+            build_configuration=build_configuration,
+            provisioning_profiles_path=provisioning_path,
+            additional_codesigning_output_path=additional_codesigning_output_path
+        )
+        if disable_push_entitlements:
+            codesigning_data.aps_environment = ''
     if codesigning_data.aps_environment is None:
         print('Could not find a valid aps-environment entitlement in the provided provisioning profiles')
         sys.exit(1)
@@ -609,6 +619,9 @@ def build(bazel, arguments):
         override_xcode_version=arguments.overrideXcodeVersion,
         bazel_user_root=arguments.bazelUserRoot
     )
+
+    if arguments.disableProvisioningProfiles:
+        bazel_command_line.set_disable_provisioning_profiles()
 
     if arguments.lock:
         bazel_command_line.set_lock(True)
@@ -976,6 +989,18 @@ if __name__ == '__main__':
         ],
         required=True,
         help='Build configuration'
+    )
+    buildParser.add_argument(
+        '--disableProvisioningProfiles',
+        action='store_true',
+        default=False,
+        help='Build without embedding provisioning profiles (for unsigned/device sideload builds).'
+    )
+    buildParser.add_argument(
+        '--disablePushEntitlements',
+        action='store_true',
+        default=False,
+        help='Omit the aps-environment entitlement; push notifications will be unavailable.'
     )
     buildParser.add_argument(
         '--enableParallelSwiftmoduleGeneration',

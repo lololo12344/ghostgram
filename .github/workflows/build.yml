@@ -30,15 +30,14 @@ jobs:
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
-          BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
         run: |
           python3 - <<'PY'
           import json, os
-          p = "build-system/appstore-configuration.json"
+          p = "build-system/ghostgram-configuration.json"
           with open(p, encoding="utf-8") as f:
               d = json.load(f)
           changed = []
-          for key, env in (("api_id", "API_ID"), ("api_hash", "API_HASH"), ("bundle_id", "BUNDLE_ID")):
+          for key, env in (("api_id", "API_ID"), ("api_hash", "API_HASH")):
               val = os.environ.get(env)
               if val:
                   d[key] = val
@@ -77,14 +76,14 @@ jobs:
           echo "BUILD_NUMBER=$(echo $BUILD_NUMBER)" >> $GITHUB_ENV
           echo "APP_VERSION=$(echo $APP_VERSION)" >> $GITHUB_ENV
 
-          python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
             build \
-            --configurationPath="build-system/appstore-configuration.json" \
-            --codesigningInformationPath=build-system/fake-codesigning \
+            --configurationPath="build-system/ghostgram-configuration.json" \
             --configuration=release_arm64 \
-            --buildNumber="$BUILD_NUMBER"
+            --buildNumber="$BUILD_NUMBER" \
+            --disableProvisioningProfiles \
+            --disablePushEntitlements
 
           # collect ipa
           OUTPUT_PATH="build/artifacts"
