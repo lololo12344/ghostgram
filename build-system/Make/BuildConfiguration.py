@@ -176,15 +176,29 @@ def copy_profiles_from_directory(source_path, destination_path, team_id, bundle_
             if not file_path.endswith('.mobileprovision'):
                 continue
 
-            profile_data = run_executable_with_output('openssl', arguments=[
-                'smime',
-                '-inform',
-                'der',
-                '-verify',
-                '-noverify',
-                '-in',
-                file_path
-            ], decode=False, stderr_to_stdout=False, check_result=True)
+            # Try openssl first (works on most systems)
+            try:
+                profile_data = run_executable_with_output('openssl', arguments=[
+                    'smime',
+                    '-inform',
+                    'der',
+                    '-verify',
+                    '-noverify',
+                    '-in',
+                    file_path
+                ], decode=False, stderr_to_stdout=False, check_result=True)
+            except:
+                # Fallback to security cms -D (macOS)
+                try:
+                    profile_data = run_executable_with_output('security', arguments=[
+                        'cms',
+                        '-D',
+                        '-i',
+                        file_path
+                    ], decode=False, stderr_to_stdout=False, check_result=True)
+                except:
+                    print('Warning: Could not decode provisioning profile at {}'.format(file_path))
+                    continue
 
             profile_dict = plistlib.loads(profile_data)
             profile_name = profile_dict['Entitlements']['application-identifier']
@@ -204,15 +218,29 @@ def resolve_aps_environment_from_directory(source_path, team_id, bundle_id):
             if not file_path.endswith('.mobileprovision'):
                 continue
 
-            profile_data = run_executable_with_output('openssl', arguments=[
-                'smime',
-                '-inform',
-                'der',
-                '-verify',
-                '-noverify',
-                '-in',
-                file_path
-            ], decode=False, stderr_to_stdout=False, check_result=True)
+            # Try openssl first (works on most systems)
+            try:
+                profile_data = run_executable_with_output('openssl', arguments=[
+                    'smime',
+                    '-inform',
+                    'der',
+                    '-verify',
+                    '-noverify',
+                    '-in',
+                    file_path
+                ], decode=False, stderr_to_stdout=False, check_result=True)
+            except:
+                # Fallback to security cms -D (macOS)
+                try:
+                    profile_data = run_executable_with_output('security', arguments=[
+                        'cms',
+                        '-D',
+                        '-i',
+                        file_path
+                    ], decode=False, stderr_to_stdout=False, check_result=True)
+                except:
+                    print('Warning: Could not decode provisioning profile at {}'.format(file_path))
+                    continue
 
             profile_dict = plistlib.loads(profile_data)
             profile_name = profile_dict['Entitlements']['application-identifier']
