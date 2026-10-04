@@ -289,6 +289,7 @@ class BazelCommandLine:
             combined_arguments += ['--spawn_strategy=sandboxed']
 
         if self.disable_provisioning_profiles:
+            combined_arguments += ['--features=disable_legacy_signing']
             combined_arguments += ['--//Telegram:disableProvisioningProfiles']
 
         combined_arguments += self.common_args

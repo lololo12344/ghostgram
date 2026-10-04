@@ -80,6 +80,31 @@ jobs:
           echo "BUILD_NUMBER=$(echo $BUILD_NUMBER)" >> $GITHUB_ENV
           echo "APP_VERSION=$(echo $APP_VERSION)" >> $GITHUB_ENV
 
+          # rules_apple normally requires an embedded profile for device bundles;
+          # this build is unsigned and will be re-signed by Sideloadly.
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("build-system/bazel-rules/rules_apple/apple/internal/partials/provisioning_profile.bzl")
+          source = path.read_text(encoding="utf-8")
+          original = "\n".join([
+              "    if not profile_artifact:",
+              "        fail(",
+              '            "\\n".join([',
+              '                "ERROR: In {}:".format(str(rule_label)),',
+              '                "Building for device, but no provisioning_profile attribute was set.",',
+              "            ]),",
+              "        )",
+          ])
+          replacement = "\n".join([
+              "    if not profile_artifact:",
+              "        return struct(bundle_files = [])",
+          ])
+          if source.count(original) != 1:
+              raise SystemExit("rules_apple provisioning-profile block did not match the expected version")
+          path.write_text(source.replace(original, replacement, 1), encoding="utf-8")
+          PY
+
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
             build \
