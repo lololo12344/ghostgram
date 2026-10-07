@@ -46,7 +46,7 @@ python3 build-system/Make/Make.py \
 ## 🏗 Advanced Build Options
 
 ### Building an IPA (Release)
-1. Configure `build-system/appstore-configuration.json`.
+1. Copy `build-system/appstore-configuration.json` to a private local configuration file and replace its `api_id` and `api_hash` placeholders with your credentials. Do not commit that file. For Xcode builds, also set the `API_ID` and `API_HASH` build settings (or pass them to `xcodebuild`).
 2. Ensure you have the correct provisioning profiles.
 3. Run:
 ```bash

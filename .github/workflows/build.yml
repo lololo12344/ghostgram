@@ -30,16 +30,17 @@ jobs:
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
+          BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
         run: |
           python3 - <<'PY'
-          import json, os
+          import json, os, re
           p = "build-system/ghostgram-configuration.json"
           required = ("API_ID", "API_HASH")
           missing = [name for name in required if not os.environ.get(name)]
           if missing:
               raise SystemExit("Missing required GitHub Actions secrets: " + ", ".join(missing))
           api_id = os.environ["API_ID"].strip()
-          if not api_id.isdecimal():
+          if not api_id.isascii() or not api_id.isdecimal():
               raise SystemExit("API_ID must be the numeric ID from my.telegram.org; its value is not logged")
           api_hash = os.environ["API_HASH"].strip()
           if len(api_hash) != 32 or any(char not in "0123456789abcdefABCDEF" for char in api_hash):
@@ -47,15 +48,19 @@ jobs:
           with open(p, encoding="utf-8") as f:
               d = json.load(f)
           changed = []
-          for key, env in (("api_id", "API_ID"), ("api_hash", "API_HASH")):
-              val = api_id if env == "API_ID" else api_hash
-              if val:
-                  d[key] = val
-                  changed.append(key)
+          bundle_id = os.environ.get("BUNDLE_ID", "").strip()
+          if bundle_id:
+              if not re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", bundle_id):
+                  raise SystemExit("BUNDLE_ID must be a reverse-DNS identifier; its value is not logged")
+              d["bundle_id"] = bundle_id
+              changed.append("bundle_id")
+          for key, value in (("api_id", api_id), ("api_hash", api_hash)):
+              d[key] = value
+              changed.append(key)
           with open(p, "w", encoding="utf-8") as f:
               json.dump(d, f, indent="\t", ensure_ascii=False)
           print("Injected from secrets:", changed)
-          print("bundle_id =", d.get("bundle_id"), "| api_id set =", bool(d.get("api_id")))
+          print("bundle_id set =", bool(d.get("bundle_id")), "| api_id set =", bool(d.get("api_id")))
           PY
 
       - name: Create canonical source directory

@@ -8,7 +8,7 @@
 2. **Apple ID** (можно бесплатный).
 3. На Windows: **GitHub Desktop** (https://desktop.github.com) и **AltStore** (https://altstore.io) или **Sideloadly** (https://sideloadly.io).
 
-Ваши `api_id` и `api_hash` уже вшиты в конфиг сборки (`build-system/appstore-configuration.json`), поэтому секреты задавать не обязательно. Но можно переопределить их через секреты GitHub (см. ниже), чтобы они не хранились в коде.
+`api_id` и `api_hash` не хранятся в репозитории. Для сборки через GitHub Actions обязательно добавьте их как секреты репозитория — без них workflow остановится до начала сборки.
 
 ## Шаг 1. Форкнуть исходный репозиторий
 
@@ -23,17 +23,17 @@
 3. Распакуйте его и **скопируйте содержимое с заменой файлов** в папку, куда склонирован форк (файлы в архиве лежат по тем же путям, что и в репозитории).
 4. Откройте GitHub Desktop — он покажет изменённые файлы. Напишите любой комментарий и нажмите **Commit to main**, затем **Push origin**.
 
-## Шаг 3 (необязательно). Секреты GitHub
+## Шаг 3. Добавить секреты GitHub
 
-Если хотите хранить ключи не в коде, в репозитории: **Settings → Secrets and variables → Actions → New repository secret**:
+Откройте **Settings → Secrets and variables → Actions → New repository secret** и добавьте:
 
 | Имя | Значение |
 |---|---|
 | `API_ID` | ваш api_id |
 | `API_HASH` | ваш api_hash |
-| `BUNDLE_ID` | уникальный id, например `com.yourname.ghostgram` |
+| `BUNDLE_ID` (необязательно) | уникальный id, например `com.yourname.ghostgram`; если не задан, используется `com.ghostgram.app` |
 
-> Эти значения (если заданы) подменяют вшитые на этапе сборки.
+Workflow проверяет формат `API_ID` и `API_HASH` и использует их только во время сборки. Не записывайте эти значения в исходный код или публичные конфиги. Если API hash уже публиковался, безопаснее создать новую пару на my.telegram.org и сохранить новую в Secrets.
 
 ## Шаг 4. Запустить сборку
 
@@ -64,10 +64,10 @@
 
 - `Xcode_XX.app not found` → в `.github/workflows/build.yml` поменяйте `runs-on: macos-15` на раннер, где есть Xcode из `versions.json`.
 - Ошибка в подмодулях (`submodule ... not found`) → проверьте `.gitmodules` (я уже исправил сломанные относительные ссылки на публичные зеркала `ali-fareed/*`).
-- Пустые ключи → проверьте Шаг 3 или вшитые значения в `build-system/appstore-configuration.json`.
+- Ошибка `Missing required GitHub Actions secrets` → проверьте, что `API_ID` и `API_HASH` добавлены в Secrets именно того репозитория, где запускается workflow.
 
 ---
 
 ## Что уже сделано в этом коде
 
-Подробно см. [SECURITY-AUDIT.md](SECURITY-AUDIT.md). Кратко: убраны все обращения к чужому серверу Swiftgram (`api.swiftgram.app`), отключена платная подписка (все функции разблокированы), убран HockeyApp-телеметрия, вшиты ваши `api_id`/`api_hash`, приложение переименовано в **Ghostgram**. Ghost-фичи (Ghost Mode, Anti-Delete, отложенная отправка, обход view-once, локальная транскрипция) сохранены.
+Подробно см. [SECURITY-AUDIT.md](SECURITY-AUDIT.md). Кратко: убраны все обращения к чужому серверу Swiftgram (`api.swiftgram.app`), отключена платная подписка (все функции разблокированы), убрана HockeyApp-телеметрия, API credentials поступают из GitHub Secrets во время сборки, приложение переименовано в **Ghostgram**. Ghost-фичи (Ghost Mode, Anti-Delete, отложенная отправка, обход view-once, локальная транскрипция) сохранены.

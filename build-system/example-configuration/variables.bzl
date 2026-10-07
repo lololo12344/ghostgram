@@ -1,7 +1,7 @@
 
 telegram_bundle_id = "ph.telegra.Telegraph"
-telegram_api_id = "26000763"
-telegram_api_hash = "74d99973fb6a389f1326b41bb7709b76"
+telegram_api_id = "{! set API_ID in your local configuration !}"
+telegram_api_hash = "{! set API_HASH in your local configuration !}"
 telegram_team_id = "C67CF9S4VU"
 telegram_app_center_id = "0"
 telegram_is_internal_build = "false"

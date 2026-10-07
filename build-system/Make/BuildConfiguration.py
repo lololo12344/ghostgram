@@ -84,10 +84,20 @@ def build_configuration_from_json(path):
         for key in required_keys:
             if key not in configuration_dict:
                 print('Configuration at {} does not contain {}'.format(path, key))
+        api_id = configuration_dict.get('api_id')
+        if not isinstance(api_id, str) or not api_id.isascii() or not api_id.isdecimal():
+            print('Configuration at {} must contain a numeric api_id'.format(path))
+            sys.exit(1)
+        api_hash = configuration_dict.get('api_hash')
+        if not isinstance(api_hash, str) or len(api_hash) != 32 or any(
+            character not in '0123456789abcdefABCDEF' for character in api_hash
+        ):
+            print('Configuration at {} must contain a 32-character hexadecimal api_hash'.format(path))
+            sys.exit(1)
         return BuildConfiguration(
             bundle_id=configuration_dict['bundle_id'],
-            api_id=configuration_dict['api_id'],
-            api_hash=configuration_dict['api_hash'],
+            api_id=api_id,
+            api_hash=api_hash,
             team_id=configuration_dict['team_id'],
             app_center_id=configuration_dict['app_center_id'],
             is_internal_build=configuration_dict['is_internal_build'],

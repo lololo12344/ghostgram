@@ -47,7 +47,7 @@ python3 build-system/Make/Make.py \
 
 ## Xcode
 
-1. Copy and edit `build-system/appstore-configuration.json`.
+1. Copy `build-system/appstore-configuration.json` to a private local configuration file, set your own `api_id` and `api_hash`, and do not commit the file. For Xcode builds, also set the `API_ID` and `API_HASH` build settings (or pass them to `xcodebuild`).
 2. Copy `build-system/fake-codesigning`. Create and download provisioning profiles, using the `profiles` folder as a reference for the entitlements.
 3. Generate an Xcode project:
 ```
