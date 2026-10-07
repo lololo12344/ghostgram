@@ -30,10 +30,9 @@ jobs:
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
-          BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
         run: |
           python3 - <<'PY'
-          import json, os, re
+          import json, os
           p = "build-system/ghostgram-configuration.json"
           required = ("API_ID", "API_HASH")
           missing = [name for name in required if not os.environ.get(name)]
@@ -47,19 +46,11 @@ jobs:
               raise SystemExit("API_HASH must be the 32-character hexadecimal hash from my.telegram.org; its value is not logged")
           with open(p, encoding="utf-8") as f:
               d = json.load(f)
-          changed = []
-          bundle_id = os.environ.get("BUNDLE_ID", "").strip()
-          if bundle_id:
-              if not re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", bundle_id):
-                  raise SystemExit("BUNDLE_ID must be a reverse-DNS identifier; its value is not logged")
-              d["bundle_id"] = bundle_id
-              changed.append("bundle_id")
           for key, value in (("api_id", api_id), ("api_hash", api_hash)):
               d[key] = value
-              changed.append(key)
           with open(p, "w", encoding="utf-8") as f:
               json.dump(d, f, indent="\t", ensure_ascii=False)
-          print("Injected from secrets:", changed)
+          print("Injected Telegram API credentials from repository secrets.")
           print("bundle_id set =", bool(d.get("bundle_id")), "| api_id set =", bool(d.get("api_id")))
           PY
 
