@@ -505,7 +505,22 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
         let appGroupName = "group.\(baseAppBundleId)"
-        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+        var maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+        if maybeAppGroupUrl == nil, let applicationSupportUrl = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let localStorageUrl = applicationSupportUrl.appendingPathComponent("Ghostgram", isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: localStorageUrl, withIntermediateDirectories: true, attributes: nil)
+                maybeAppGroupUrl = localStorageUrl
+                NSLog("Ghostgram: App Group unavailable; using local storage. Share extensions and widgets will not share app data.")
+            } catch {
+                NSLog("Ghostgram: Failed to initialize local storage: %@", String(describing: error))
+                self.window?.makeKeyAndVisible()
+                let alertController = UIAlertController(title: nil, message: "Ghostgram could not initialize local storage.", preferredStyle: .alert)
+                alertController.addAction(UIAlertAction(title: "OK", style: .default))
+                self.mainWindow?.presentNative(alertController)
+                return true
+            }
+        }
         
         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
         self.buildConfig = buildConfig
@@ -604,7 +619,10 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         }, autolockDeadine: autolockDeadine, encryptionProvider: OpenSSLEncryptionProvider(), deviceModelName: nil, useBetaFeatures: !buildConfig.isAppStoreBuild, isICloudEnabled: buildConfig.isICloudEnabled)
         
         guard let appGroupUrl = maybeAppGroupUrl else {
-            self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
+            self.window?.makeKeyAndVisible()
+            let alertController = UIAlertController(title: nil, message: "Ghostgram could not access its app data container.", preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: "OK", style: .default))
+            self.mainWindow?.presentNative(alertController)
             return true
         }
         
