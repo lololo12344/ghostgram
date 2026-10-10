@@ -920,6 +920,7 @@ public final class PeerMessagesMediaPlaylist: SharedMediaPlaylist {
                     return
                 default:
                     break
+            }
             if MiscSettingsManager.shared.shouldDisableViewOnceAutoDelete && (item.message.isSelfExpiring || item.message.containsSecretMedia || item.message.minAutoremoveOrClearTimeout == viewOnceTimeout) {
                 return
             }
