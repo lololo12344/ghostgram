@@ -2043,8 +2043,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
     
     public func updateIsExtractedToContextPreview(_ value: Bool) {
         if value {
-            let allowSelection = MiscSettingsManager.shared.shouldBypassCopyProtection || (!item.associatedData.isCopyProtectionEnabled && !item.message.isCopyProtected())
-            if self.textSelectionNode == nil, self.textClippingNode.supernode != nil, let item = self.arguments, allowSelection, let rootNode = item.controllerInteraction.chatControllerNode() {
+            if self.textSelectionNode == nil, self.textClippingNode.supernode != nil, let item = self.arguments, (MiscSettingsManager.shared.shouldBypassCopyProtection || (!item.associatedData.isCopyProtectionEnabled && !item.message.isCopyProtected())), let rootNode = item.controllerInteraction.chatControllerNode() {
                 let selectionColor: UIColor
                 let knobColor: UIColor
                 if item.message.effectivelyIncoming(item.context.account.peerId) {
