@@ -1602,7 +1602,7 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     }
                 }
                 
-                let enableCopy = (!item.associatedData.isCopyProtectionEnabled && !item.message.isCopyProtected()) || item.message.id.peerId.isVerificationCodes
+                let enableCopy = MiscSettingsManager.shared.shouldBypassCopyProtection || (!item.associatedData.isCopyProtectionEnabled && !item.message.isCopyProtected()) || item.message.id.peerId.isVerificationCodes
                 textSelectionNode.enableCopy = enableCopy
                 
                 var enableQuote = !item.message.text.isEmpty

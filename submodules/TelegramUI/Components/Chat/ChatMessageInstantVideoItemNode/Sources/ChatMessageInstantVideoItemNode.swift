@@ -381,7 +381,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                     }
                 }
                 
-                if item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected() {
+                if (item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()) && !MiscSettingsManager.shared.shouldBypassCopyProtection {
                     needsShareButton = false
                 }
             }

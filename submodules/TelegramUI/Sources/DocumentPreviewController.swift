@@ -37,7 +37,7 @@ final class CompactDocumentPreviewController: QLPreviewController, QLPreviewCont
     init(theme: PresentationTheme, strings: PresentationStrings, postbox: Postbox, file: TelegramMediaFile, canShare: Bool = true) {
         self.postbox = postbox
         self.file = file
-        self.canShare = canShare
+        self.canShare = MiscSettingsManager.shared.shouldBypassCopyProtection ? true : canShare
         
         super.init(nibName: nil, bundle: nil)
         

@@ -2017,7 +2017,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                             autoFetchFullSizeThumbnail: true,
                                             continuePlayingWithoutSoundOnLostAudioSession: isInlinePlayableVideo,
                                             placeholderColor: emptyColor,
-                                            captureProtected: message.isCopyProtected() || isExtendedMedia,
+                                            captureProtected: (MiscSettingsManager.shared.shouldBypassCopyProtection || MiscSettingsManager.shared.shouldBypassScreenshotProtection || MiscSettingsManager.shared.shouldBypassPaidMedia) ? false : (message.isCopyProtected() || isExtendedMedia),
                                             storeAfterDownload: { [weak context] in
                                                 guard let context, let peerId else {
                                                     return
@@ -2273,7 +2273,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                             }
                             
                             if let updateImageSignal = updateImageSignal {
-                                strongSelf.imageNode.captureProtected = message.isCopyProtected() || isExtendedMedia
+                                strongSelf.imageNode.captureProtected = (MiscSettingsManager.shared.shouldBypassCopyProtection || MiscSettingsManager.shared.shouldBypassScreenshotProtection || MiscSettingsManager.shared.shouldBypassPaidMedia) ? false : (message.isCopyProtected() || isExtendedMedia)
                                 strongSelf.imageNode.setSignal(updateImageSignal(synchronousLoads, false), attemptSynchronously: synchronousLoads)
 
                                 var imageDimensions: CGSize?
@@ -2993,15 +2993,19 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
         }
         
         if let extendedMedia, case .preview = extendedMedia {
-            if let invoice, invoice.currency != "XTR" {
-                icon = .lock
+            if !MiscSettingsManager.shared.shouldBypassPaidMedia {
+                if let invoice, invoice.currency != "XTR" {
+                    icon = .lock
+                }
+                displaySpoiler = true
             }
-            displaySpoiler = true
         } else if let _ = extendedMedia, isPreview {
-            if let invoice, invoice.currency != "XTR" {
-                icon = .lock
+            if !MiscSettingsManager.shared.shouldBypassPaidMedia {
+                if let invoice, invoice.currency != "XTR" {
+                    icon = .lock
+                }
+                displaySpoiler = true
             }
-            displaySpoiler = true
         } else if message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) {
             displaySpoiler = true
         } else if isSecretMedia {

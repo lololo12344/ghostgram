@@ -1281,7 +1281,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
+        let isCopyProtected = MiscSettingsManager.shared.shouldBypassCopyProtection ? false : (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected())
         if !messageText.isEmpty || (resourceAvailable && isImage) || diceEmoji != nil {
             if !isExpired {
                 if !isPoll {
@@ -1403,7 +1403,8 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        if resourceAvailable, !message.containsSecretMedia && !isCopyProtected {
+        let allowSaveMedia = MiscSettingsManager.shared.shouldBypassCopyProtection || MiscSettingsManager.shared.shouldBypassPaidMedia || (!message.containsSecretMedia && !isCopyProtected)
+        if resourceAvailable, allowSaveMedia {
             var mediaReference: AnyMediaReference?
             var isVideo = false
             for media in message.media {
@@ -1414,6 +1415,22 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     mediaReference = FileMediaReference.standalone(media: file).abstract
                     isVideo = true
                     break
+                } else if let paidContent = media as? TelegramMediaPaidContent {
+                    for ext in paidContent.extendedMedia {
+                        if case let .full(fullMedia) = ext {
+                            if let image = fullMedia as? TelegramMediaImage, let _ = largestImageRepresentation(image.representations) {
+                                mediaReference = ImageMediaReference.standalone(media: image).abstract
+                                break
+                            } else if let file = fullMedia as? TelegramMediaFile, file.isVideo {
+                                mediaReference = FileMediaReference.standalone(media: file).abstract
+                                isVideo = true
+                                break
+                            }
+                        }
+                    }
+                    if mediaReference != nil {
+                        break
+                    }
                 }
             }
             if let mediaReference = mediaReference {
@@ -1849,7 +1866,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     }
                     if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
                         
-                    } else if let file = media as? TelegramMediaFile, !isCopyProtected {
+                    } else if let file = media as? TelegramMediaFile, (!isCopyProtected || MiscSettingsManager.shared.shouldBypassCopyProtection) {
                         if file.isVideo {
                             if file.isAnimated && !file.isVideoSticker {
                                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_SaveGif, icon: { theme in
@@ -1902,7 +1919,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         }
 
         if data.messageActions.options.contains(.forward) {
-            if !isCopyProtected {
+            if !isCopyProtected || MiscSettingsManager.shared.shouldBypassCopyProtection {
                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
                 }, action: { _, f in
@@ -2667,9 +2684,13 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Peer
                 }
                 for media in message.media {
                     if let invoice = media as? TelegramMediaInvoice, let _ = invoice.extendedMedia {
-                        isShareProtected = true
+                        if !MiscSettingsManager.shared.shouldBypassPaidMedia {
+                            isShareProtected = true
+                        }
                     } else if let _ = media as? TelegramMediaPaidContent {
-                        isExternalShareProtected = true
+                        if !MiscSettingsManager.shared.shouldBypassPaidMedia {
+                            isExternalShareProtected = true
+                        }
                     } else if let file = media as? TelegramMediaFile, file.isSticker {
                         for case let .Sticker(_, packReference, _) in file.attributes {
                             if let _ = packReference {

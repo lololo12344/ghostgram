@@ -241,7 +241,7 @@ private func ghostgramSettingsControllerEntries(
     let deletedStatus = state.deletedMessagesEnabled ? "Вкл" : "Выкл"
     entries.append(.deletedMessages(theme, "Анти-удаление сообщений", deletedStatus))
     
-    let miscStatus = state.miscEnabled ? "\(state.miscActiveCount)/5" : "Выкл"
+    let miscStatus = state.miscEnabled ? "\(state.miscActiveCount)/6" : "Выкл"
     entries.append(.misc(theme, "Многоразовые медиа & Защита", miscStatus))
     
     // Tools Section

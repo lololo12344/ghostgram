@@ -2282,6 +2282,9 @@ public extension TelegramEngine.EngineData.Item {
             }
 
             func extract(view: PostboxView) -> Result {
+                if MiscSettingsManager.shared.shouldBypassCopyProtection {
+                    return false
+                }
                 guard let view = view as? BasicPeerView else {
                     preconditionFailure()
                 }

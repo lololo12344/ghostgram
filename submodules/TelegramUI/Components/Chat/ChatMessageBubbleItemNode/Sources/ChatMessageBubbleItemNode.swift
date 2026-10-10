@@ -1845,7 +1845,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 }
             }
             
-            if (item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()) {
+            if (item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()) && !MiscSettingsManager.shared.shouldBypassCopyProtection {
                 if mayHaveSeparateCommentsButton && hasCommentButton(item: item) {
                 } else {
                     needsShareButton = false
@@ -3394,7 +3394,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         
         if let paidContent = item.message.media.first(where: { $0 is TelegramMediaPaidContent }) as? TelegramMediaPaidContent, let media = paidContent.extendedMedia.first {
             var isLocked = false
-            if case .preview = media {
+            if MiscSettingsManager.shared.shouldBypassPaidMedia {
+                isLocked = false
+            } else if case .preview = media {
                 isLocked = true
             } else if item.presentationData.isPreview {
                 isLocked = true

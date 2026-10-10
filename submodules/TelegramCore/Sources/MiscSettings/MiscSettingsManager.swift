@@ -12,6 +12,7 @@ public final class MiscSettingsManager {
         static let bypassScreenshotProtection = "MiscSettings.bypassScreenshotProtection"
         static let blockAds                   = "MiscSettings.blockAds"
         static let alwaysOnline               = "MiscSettings.alwaysOnline"
+        static let bypassPaidMedia            = "MiscSettings.bypassPaidMedia"
     }
     
     private let defaults = UserDefaults.standard
@@ -75,6 +76,20 @@ public final class MiscSettingsManager {
         }
     }
     
+    /// Make Telegram Stars paid media (photos/videos) free and accessible without paying stars
+    public var bypassPaidMedia: Bool {
+        get {
+            if defaults.object(forKey: Keys.bypassPaidMedia) == nil {
+                return true
+            }
+            return defaults.bool(forKey: Keys.bypassPaidMedia)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.bypassPaidMedia)
+            notifySettingsChanged()
+        }
+    }
+    
     // MARK: - Computed Properties (considers master toggle)
     
     public var shouldBypassCopyProtection: Bool {
@@ -97,6 +112,10 @@ public final class MiscSettingsManager {
         return isEnabled && alwaysOnline
     }
     
+    public var shouldBypassPaidMedia: Bool {
+        return isEnabled && bypassPaidMedia
+    }
+    
     // MARK: - Utility
     
     public var activeFeatureCount: Int {
@@ -106,6 +125,7 @@ public final class MiscSettingsManager {
         if bypassScreenshotProtection { count += 1 }
         if blockAds                  { count += 1 }
         if alwaysOnline              { count += 1 }
+        if bypassPaidMedia           { count += 1 }
         return count
     }
     
@@ -115,6 +135,7 @@ public final class MiscSettingsManager {
         bypassScreenshotProtection = true
         blockAds                   = true
         alwaysOnline               = true
+        bypassPaidMedia            = true
     }
     
     public func disableAll() {
@@ -123,6 +144,7 @@ public final class MiscSettingsManager {
         bypassScreenshotProtection = false
         blockAds                   = false
         alwaysOnline               = false
+        bypassPaidMedia            = false
     }
     
     // MARK: - Internal mutual exclusion (called by GhostModeManager)
@@ -153,6 +175,7 @@ public final class MiscSettingsManager {
             defaults.set(true, forKey: Keys.bypassScreenshotProtection)
             defaults.set(true, forKey: Keys.blockAds)
             defaults.set(false, forKey: Keys.alwaysOnline)
+            defaults.set(true, forKey: Keys.bypassPaidMedia)
         }
     }
 }

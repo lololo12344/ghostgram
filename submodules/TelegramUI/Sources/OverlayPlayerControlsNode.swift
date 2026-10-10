@@ -496,7 +496,7 @@ final class OverlayPlayerControlsNode: ASDisplayNode {
                 if let (_, valueOrLoading, _) = value, case let .state(value) = valueOrLoading, let source = value.item.playbackData?.source {
                     switch source {
                         case let .telegramFile(fileReference, isCopyProtected, _):
-                            canShare = !isCopyProtected
+                            canShare = MiscSettingsManager.shared.shouldBypassCopyProtection || !isCopyProtected
                             strongSelf.currentFileReference = fileReference
                             if let size = fileReference.media.size {
                                 strongSelf.scrubberNode.bufferingStatus = strongSelf.account.postbox.mediaBox.resourceRangesStatus(fileReference.media.resource)

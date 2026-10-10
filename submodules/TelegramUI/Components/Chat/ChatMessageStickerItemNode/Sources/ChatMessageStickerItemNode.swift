@@ -564,7 +564,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     }
                 }
                 
-                if item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected() {
+                if (item.associatedData.isCopyProtectionEnabled || item.message.isCopyProtected()) && !MiscSettingsManager.shared.shouldBypassCopyProtection {
                     if hasCommentButton(item: item) {
                     } else {
                         needsShareButton = false

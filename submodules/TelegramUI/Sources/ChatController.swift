@@ -2546,6 +2546,11 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 
                 for media in message.media {
                     if let paidContent = media as? TelegramMediaPaidContent {
+                        if MiscSettingsManager.shared.shouldBypassPaidMedia {
+                            let _ = strongSelf.context.engine.messages.updateExtendedMedia(messageIds: [message.id]).startStandalone()
+                            strongSelf.controllerInteraction?.openMessage(message, OpenMessageParams(progress: nil))
+                            return
+                        }
                         let progressSignal = Signal<Never, NoError> { _ in
                             params?.progress?.set(.single(true))
                             return ActionDisposable {
@@ -9801,6 +9806,10 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if let paidContent = media as? TelegramMediaPaidContent, let extendedMedia = paidContent.extendedMedia.first {
                 switch extendedMedia {
                     case .preview:
+                        if MiscSettingsManager.shared.shouldBypassPaidMedia {
+                            let _ = self.context.engine.messages.updateExtendedMedia(messageIds: [message.id]).startStandalone()
+                            break
+                        }
                         if displayVoiceMessageDiscardAlert() {
                             self.controllerInteraction?.openCheckoutOrReceipt(message.id, params)
                             return true

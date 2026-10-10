@@ -22,6 +22,7 @@ private enum MiscEntry: ItemListNodeEntry {
     case bypassCopyProtection(PresentationTheme, String, Bool)
     case disableViewOnceAutoDelete(PresentationTheme, String, Bool)
     case bypassScreenshotProtection(PresentationTheme, String, Bool)
+    case bypassPaidMedia(PresentationTheme, String, Bool)
     case blockAds(PresentationTheme, String, Bool)
     case alwaysOnline(PresentationTheme, String, Bool)
     
@@ -29,7 +30,7 @@ private enum MiscEntry: ItemListNodeEntry {
         switch self {
         case .masterHeader, .masterToggle, .masterInfo:
             return MiscSection.master.rawValue
-        case .featuresHeader, .bypassCopyProtection, .disableViewOnceAutoDelete, .bypassScreenshotProtection, .blockAds, .alwaysOnline:
+        case .featuresHeader, .bypassCopyProtection, .disableViewOnceAutoDelete, .bypassScreenshotProtection, .bypassPaidMedia, .blockAds, .alwaysOnline:
             return MiscSection.features.rawValue
         }
     }
@@ -43,8 +44,9 @@ private enum MiscEntry: ItemListNodeEntry {
         case .bypassCopyProtection: return 4
         case .disableViewOnceAutoDelete: return 5
         case .bypassScreenshotProtection: return 6
-        case .blockAds: return 7
-        case .alwaysOnline: return 8
+        case .bypassPaidMedia: return 7
+        case .blockAds: return 8
+        case .alwaysOnline: return 9
         }
     }
     
@@ -85,6 +87,12 @@ private enum MiscEntry: ItemListNodeEntry {
             return false
         case let .bypassScreenshotProtection(lhsTheme, lhsText, lhsValue):
             if case let .bypassScreenshotProtection(rhsTheme, rhsText, rhsValue) = rhs,
+               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
+                return true
+            }
+            return false
+        case let .bypassPaidMedia(lhsTheme, lhsText, lhsValue):
+            if case let .bypassPaidMedia(rhsTheme, rhsText, rhsValue) = rhs,
                lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
                 return true
             }
@@ -134,6 +142,10 @@ private enum MiscEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleBypassCopyProtection()
             })
+        case let .bypassPaidMedia(_, text, value):
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
+                arguments.toggleBypassPaidMedia()
+            })
         case let .blockAds(_, text, value):
             return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleBlockAds()
@@ -153,6 +165,7 @@ private final class MiscControllerArguments {
     let toggleBypassCopyProtection: () -> Void
     let toggleDisableViewOnceAutoDelete: () -> Void
     let toggleBypassScreenshotProtection: () -> Void
+    let toggleBypassPaidMedia: () -> Void
     let toggleBlockAds: () -> Void
     let toggleAlwaysOnline: () -> Void
     
@@ -161,6 +174,7 @@ private final class MiscControllerArguments {
         toggleBypassCopyProtection: @escaping () -> Void,
         toggleDisableViewOnceAutoDelete: @escaping () -> Void,
         toggleBypassScreenshotProtection: @escaping () -> Void,
+        toggleBypassPaidMedia: @escaping () -> Void,
         toggleBlockAds: @escaping () -> Void,
         toggleAlwaysOnline: @escaping () -> Void
     ) {
@@ -168,6 +182,7 @@ private final class MiscControllerArguments {
         self.toggleBypassCopyProtection = toggleBypassCopyProtection
         self.toggleDisableViewOnceAutoDelete = toggleDisableViewOnceAutoDelete
         self.toggleBypassScreenshotProtection = toggleBypassScreenshotProtection
+        self.toggleBypassPaidMedia = toggleBypassPaidMedia
         self.toggleBlockAds = toggleBlockAds
         self.toggleAlwaysOnline = toggleAlwaysOnline
     }
@@ -180,6 +195,7 @@ private struct MiscControllerState: Equatable {
     var bypassCopyProtection: Bool
     var disableViewOnceAutoDelete: Bool
     var bypassScreenshotProtection: Bool
+    var bypassPaidMedia: Bool
     var blockAds: Bool
     var alwaysOnline: Bool
     
@@ -188,6 +204,7 @@ private struct MiscControllerState: Equatable {
                lhs.bypassCopyProtection == rhs.bypassCopyProtection &&
                lhs.disableViewOnceAutoDelete == rhs.disableViewOnceAutoDelete &&
                lhs.bypassScreenshotProtection == rhs.bypassScreenshotProtection &&
+               lhs.bypassPaidMedia == rhs.bypassPaidMedia &&
                lhs.blockAds == rhs.blockAds &&
                lhs.alwaysOnline == rhs.alwaysOnline
     }
@@ -204,17 +221,19 @@ private func miscControllerEntries(presentationData: PresentationData, state: Mi
     if state.disableViewOnceAutoDelete { activeCount += 1 }
     if state.bypassScreenshotProtection { activeCount += 1 }
     if state.bypassCopyProtection { activeCount += 1 }
+    if state.bypassPaidMedia { activeCount += 1 }
     if state.blockAds { activeCount += 1 }
     if state.alwaysOnline { activeCount += 1 }
     
     entries.append(.masterHeader(theme, "ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ"))
-    entries.append(.masterToggle(theme, "Защита и медиа", state.isEnabled, activeCount, 5))
+    entries.append(.masterToggle(theme, "Защита и медиа", state.isEnabled, activeCount, 6))
     entries.append(.masterInfo(theme, "Включение локальных модификаций для работы с защищёнными медиа."))
     
     entries.append(.featuresHeader(theme, "ФУНКЦИИ"))
     entries.append(.disableViewOnceAutoDelete(theme, "Многоразовый View-Once", state.disableViewOnceAutoDelete))
     entries.append(.bypassScreenshotProtection(theme, "Разрешить скриншоты", state.bypassScreenshotProtection))
-    entries.append(.bypassCopyProtection(theme, "Обход запрета копирования", state.bypassCopyProtection))
+    entries.append(.bypassCopyProtection(theme, "Сохранение из закрытых каналов", state.bypassCopyProtection))
+    entries.append(.bypassPaidMedia(theme, "Бесплатные медиа за звёзды", state.bypassPaidMedia))
     entries.append(.blockAds(theme, "Блокировать рекламу", state.blockAds))
     entries.append(.alwaysOnline(theme, "Всегда в сети", state.alwaysOnline))
     
@@ -230,6 +249,7 @@ public func miscController(context: AccountContext) -> ViewController {
             bypassCopyProtection: MiscSettingsManager.shared.bypassCopyProtection,
             disableViewOnceAutoDelete: MiscSettingsManager.shared.disableViewOnceAutoDelete,
             bypassScreenshotProtection: MiscSettingsManager.shared.bypassScreenshotProtection,
+            bypassPaidMedia: MiscSettingsManager.shared.bypassPaidMedia,
             blockAds: MiscSettingsManager.shared.blockAds,
             alwaysOnline: MiscSettingsManager.shared.alwaysOnline
         ),
@@ -240,6 +260,7 @@ public func miscController(context: AccountContext) -> ViewController {
         bypassCopyProtection: MiscSettingsManager.shared.bypassCopyProtection,
         disableViewOnceAutoDelete: MiscSettingsManager.shared.disableViewOnceAutoDelete,
         bypassScreenshotProtection: MiscSettingsManager.shared.bypassScreenshotProtection,
+        bypassPaidMedia: MiscSettingsManager.shared.bypassPaidMedia,
         blockAds: MiscSettingsManager.shared.blockAds,
         alwaysOnline: MiscSettingsManager.shared.alwaysOnline
     ))
@@ -281,6 +302,13 @@ public func miscController(context: AccountContext) -> ViewController {
                 state.bypassScreenshotProtection = newValue
             }
         },
+        toggleBypassPaidMedia: {
+            let newValue = !MiscSettingsManager.shared.bypassPaidMedia
+            MiscSettingsManager.shared.bypassPaidMedia = newValue
+            updateState { state in
+                state.bypassPaidMedia = newValue
+            }
+        },
         toggleBlockAds: {
             let newValue = !MiscSettingsManager.shared.blockAds
             MiscSettingsManager.shared.blockAds = newValue
@@ -298,10 +326,9 @@ public func miscController(context: AccountContext) -> ViewController {
         }
     )
     
-    // Refresh UI when Ghost Mode is auto-disabled by mutual exclusion —
-    // the toggle flip happens externally, so we must pull fresh values from the managers.
+    // Refresh UI when Ghost Mode or MiscSettings is updated externally
     let ghostModeChangedSignal: Signal<Void, NoError> = Signal { subscriber in
-        let observer = NotificationCenter.default.addObserver(
+        let observer1 = NotificationCenter.default.addObserver(
             forName: GhostModeManager.settingsChangedNotification,
             object: nil,
             queue: .main
@@ -311,11 +338,30 @@ public func miscController(context: AccountContext) -> ViewController {
                 state.bypassCopyProtection       = MiscSettingsManager.shared.bypassCopyProtection
                 state.disableViewOnceAutoDelete  = MiscSettingsManager.shared.disableViewOnceAutoDelete
                 state.bypassScreenshotProtection = MiscSettingsManager.shared.bypassScreenshotProtection
+                state.bypassPaidMedia            = MiscSettingsManager.shared.bypassPaidMedia
                 state.blockAds                   = MiscSettingsManager.shared.blockAds
                 state.alwaysOnline               = MiscSettingsManager.shared.alwaysOnline
             }
         }
-        return ActionDisposable { NotificationCenter.default.removeObserver(observer) }
+        let observer2 = NotificationCenter.default.addObserver(
+            forName: MiscSettingsManager.settingsChangedNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            updateState { state in
+                state.isEnabled                  = MiscSettingsManager.shared.isEnabled
+                state.bypassCopyProtection       = MiscSettingsManager.shared.bypassCopyProtection
+                state.disableViewOnceAutoDelete  = MiscSettingsManager.shared.disableViewOnceAutoDelete
+                state.bypassScreenshotProtection = MiscSettingsManager.shared.bypassScreenshotProtection
+                state.bypassPaidMedia            = MiscSettingsManager.shared.bypassPaidMedia
+                state.blockAds                   = MiscSettingsManager.shared.blockAds
+                state.alwaysOnline               = MiscSettingsManager.shared.alwaysOnline
+            }
+        }
+        return ActionDisposable {
+            NotificationCenter.default.removeObserver(observer1)
+            NotificationCenter.default.removeObserver(observer2)
+        }
     }
     let _ = ghostModeChangedSignal.start()
     

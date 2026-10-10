@@ -945,7 +945,7 @@ final class ChatItemGalleryFooterContentNode: GalleryFooterContentNode, ASScroll
             canEdit = false
         }
         
-        if message.isCopyProtected() || peerIsCopyProtected || message.paidContent != nil {
+        if (message.isCopyProtected() || peerIsCopyProtected || message.paidContent != nil) && !MiscSettingsManager.shared.shouldBypassCopyProtection && !MiscSettingsManager.shared.shouldBypassPaidMedia {
             canShare = false
             canEdit = false
         }
@@ -1743,17 +1743,42 @@ final class ChatItemGalleryFooterContentNode: GalleryFooterContentNode, ASScroll
                                     preferredAction = .saveToCameraRoll
                                     actionCompletionText = strongSelf.presentationData.strings.Gallery_VideoSaved
                                 }
+                            } else if let paidContent = m as? TelegramMediaPaidContent {
+                                for ext in paidContent.extendedMedia {
+                                    if case let .full(fullMedia) = ext {
+                                        if let image = fullMedia as? TelegramMediaImage {
+                                            subject = .image(image.representations.map({ ImageRepresentationWithReference(representation: $0, reference: .media(media: .message(message: MessageReference(messages[0]._asMessage()), media: fullMedia), resource: $0.resource)) }))
+                                            preferredAction = .saveToCameraRoll
+                                            actionCompletionText = strongSelf.presentationData.strings.Gallery_ImageSaved
+                                            break
+                                        } else if let file = fullMedia as? TelegramMediaFile {
+                                            subject = .media(.message(message: MessageReference(messages[0]._asMessage()), media: file), strongSelf.shareMediaParameters?())
+                                            if file.mimeType.hasPrefix("video/") || file.isVideo {
+                                                preferredAction = .saveToCameraRoll
+                                                actionCompletionText = strongSelf.presentationData.strings.Gallery_VideoSaved
+                                            } else {
+                                                preferredAction = .saveToCameraRoll
+                                                actionCompletionText = strongSelf.presentationData.strings.Gallery_ImageSaved
+                                            }
+                                            break
+                                        }
+                                    }
+                                }
                             }
                         }
                         
                         var hasExternalShare = true
                         for media in currentMessage.media {
                             if let _ = media as? TelegramMediaPaidContent {
-                                hasExternalShare = false
-                                break
+                                if !MiscSettingsManager.shared.shouldBypassPaidMedia {
+                                    hasExternalShare = false
+                                    break
+                                }
                             } else if let invoice = media as? TelegramMediaInvoice, let _ = invoice.extendedMedia {
-                                hasExternalShare = false
-                                break
+                                if !MiscSettingsManager.shared.shouldBypassPaidMedia {
+                                    hasExternalShare = false
+                                    break
+                                }
                             }
                         }
                         
