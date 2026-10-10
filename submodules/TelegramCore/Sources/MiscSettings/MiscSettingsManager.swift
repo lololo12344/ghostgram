@@ -147,7 +147,7 @@ public final class MiscSettingsManager {
     private init() {
         if !defaults.bool(forKey: "MiscSettings.initialized") {
             defaults.set(true, forKey: "MiscSettings.initialized")
-            defaults.set(false, forKey: Keys.isEnabled)
+            defaults.set(true, forKey: Keys.isEnabled)
             defaults.set(true, forKey: Keys.bypassCopyProtection)
             defaults.set(true, forKey: Keys.disableViewOnceAutoDelete)
             defaults.set(true, forKey: Keys.bypassScreenshotProtection)

@@ -181,6 +181,9 @@ private func aroundMessagesFromMessages(_ messages: [Message], centralIndex: Mes
 
 private func aroundMessagesFromView(view: MessageHistoryView, centralIndex: MessageIndex) -> [Message] {
     let filteredEntries = view.entries.filter { entry in
+        if MiscSettingsManager.shared.shouldDisableViewOnceAutoDelete {
+            return true
+        }
         if entry.message.minAutoremoveOrClearTimeout == viewOnceTimeout {
             return false
         } else {
@@ -250,6 +253,9 @@ private func navigatedMessageFromView(_ view: MessageHistoryView, anchorIndex: M
     var index = 0
     
     let filteredEntries = view.entries.filter { entry in
+        if MiscSettingsManager.shared.shouldDisableViewOnceAutoDelete {
+            return true
+        }
         if entry.message.minAutoremoveOrClearTimeout == viewOnceTimeout {
             return false
         } else {
@@ -914,6 +920,8 @@ public final class PeerMessagesMediaPlaylist: SharedMediaPlaylist {
                     return
                 default:
                     break
+            if MiscSettingsManager.shared.shouldDisableViewOnceAutoDelete && (item.message.isSelfExpiring || item.message.containsSecretMedia || item.message.minAutoremoveOrClearTimeout == viewOnceTimeout) {
+                return
             }
             let _ = self.context.engine.messages.markMessageContentAsConsumedInteractively(messageId: item.message.id).startStandalone()
         }

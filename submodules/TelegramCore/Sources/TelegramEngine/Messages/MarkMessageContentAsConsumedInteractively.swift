@@ -12,6 +12,12 @@ func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messa
             for i in 0 ..< updatedAttributes.count {
                 if let attribute = updatedAttributes[i] as? ConsumableContentMessageAttribute {
                     if !attribute.consumed {
+                        if MiscSettingsManager.shared.shouldDisableViewOnceAutoDelete {
+                            let isViewOnce = message.isSelfExpiring || message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout || message.attributes.contains(where: { ($0 as? AutoremoveTimeoutMessageAttribute)?.timeout == viewOnceTimeout || ($0 as? AutoclearTimeoutMessageAttribute)?.timeout == viewOnceTimeout })
+                            if isViewOnce {
+                                continue
+                            }
+                        }
                         updatedAttributes[i] = ConsumableContentMessageAttribute(consumed: true)
                         updateMessage = true
                         
@@ -87,6 +93,11 @@ func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messa
                     }
                 } else if let attribute = updatedAttributes[i] as? AutoclearTimeoutMessageAttribute {
                     if attribute.countdownBeginTime == nil || attribute.countdownBeginTime == 0 {
+                        // MISC: Don't start countdown for view-once if bypass enabled
+                        if attribute.timeout == viewOnceTimeout && MiscSettingsManager.shared.shouldDisableViewOnceAutoDelete {
+                            continue
+                        }
+                        
                         var timeout = attribute.timeout
                         if let duration = message.secretMediaDuration, timeout != viewOnceTimeout {
                             timeout = max(timeout, Int32(duration))

@@ -122,24 +122,24 @@ private enum MiscEntry: ItemListNodeEntry {
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .featuresHeader(_, text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
-        case let .bypassCopyProtection(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.toggleBypassCopyProtection()
-            })
         case let .disableViewOnceAutoDelete(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleDisableViewOnceAutoDelete()
             })
         case let .bypassScreenshotProtection(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleBypassScreenshotProtection()
             })
+        case let .bypassCopyProtection(_, text, value):
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
+                arguments.toggleBypassCopyProtection()
+            })
         case let .blockAds(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleBlockAds()
             })
         case let .alwaysOnline(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleAlwaysOnline()
             })
         }
@@ -201,22 +201,22 @@ private func miscControllerEntries(presentationData: PresentationData, state: Mi
     let theme = presentationData.theme
     
     var activeCount = 0
-    if state.bypassCopyProtection { activeCount += 1 }
     if state.disableViewOnceAutoDelete { activeCount += 1 }
     if state.bypassScreenshotProtection { activeCount += 1 }
+    if state.bypassCopyProtection { activeCount += 1 }
     if state.blockAds { activeCount += 1 }
     if state.alwaysOnline { activeCount += 1 }
     
-    entries.append(.masterHeader(theme, "РАСШИРЕННЫЕ ВОЗМОЖНОСТИ"))
-    entries.append(.masterToggle(theme, "Misc", state.isEnabled, activeCount, 5))
-    entries.append(.masterInfo(theme, "Когда включено, выбранные функции обхода ограничений будут активны."))
+    entries.append(.masterHeader(theme, "ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ"))
+    entries.append(.masterToggle(theme, "Защита и медиа", state.isEnabled, activeCount, 5))
+    entries.append(.masterInfo(theme, "Включение локальных модификаций для работы с защищёнными медиа."))
     
     entries.append(.featuresHeader(theme, "ФУНКЦИИ"))
-    entries.append(.bypassCopyProtection(theme, "Разрешить пересылку", state.bypassCopyProtection))
-    entries.append(.disableViewOnceAutoDelete(theme, "Сохранять View Once", state.disableViewOnceAutoDelete))
+    entries.append(.disableViewOnceAutoDelete(theme, "Многоразовый View-Once", state.disableViewOnceAutoDelete))
     entries.append(.bypassScreenshotProtection(theme, "Разрешить скриншоты", state.bypassScreenshotProtection))
+    entries.append(.bypassCopyProtection(theme, "Обход запрета копирования", state.bypassCopyProtection))
     entries.append(.blockAds(theme, "Блокировать рекламу", state.blockAds))
-    entries.append(.alwaysOnline(theme, "Вечный онлайн", state.alwaysOnline))
+    entries.append(.alwaysOnline(theme, "Всегда в сети", state.alwaysOnline))
     
     return entries
 }
@@ -328,7 +328,7 @@ public func miscController(context: AccountContext) -> ViewController {
         
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("Прочее"),
+            title: .text("Медиа & Защита"),
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back),

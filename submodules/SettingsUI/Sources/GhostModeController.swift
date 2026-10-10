@@ -123,23 +123,23 @@ private enum GhostModeEntry: ItemListNodeEntry {
         case let .featuresHeader(_, text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .hideReadReceipts(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleHideReadReceipts()
             })
         case let .hideStoryViews(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleHideStoryViews()
             })
         case let .hideOnlineStatus(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleHideOnlineStatus()
             })
         case let .hideTypingIndicator(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleHideTypingIndicator()
             })
         case let .forceOffline(_, text, value):
-            return ItemListCheckboxItem(presentationData: presentationData, title: text, style: .left, checked: value, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            return ItemListSwitchItem(presentationData: presentationData, title: text, value: value, sectionId: self.section, style: .blocks, updated: { _ in
                 arguments.toggleForceOffline()
             })
         }
@@ -209,17 +209,17 @@ private func ghostModeControllerEntries(presentationData: PresentationData, stat
     if state.forceOffline { activeCount += 1 }
     
     // Master section
-    entries.append(.masterHeader(theme, "РЕЖИМ ПРИЗРАКА"))
-    entries.append(.masterToggle(theme, "Режим призрака", state.isEnabled, activeCount, 5))
-    entries.append(.masterInfo(theme, "Когда включен, выбранные функции приватности будут активны."))
+    entries.append(.masterHeader(theme, "РЕЖИМ НЕВИДИМКИ"))
+    entries.append(.masterToggle(theme, "Режим невидимки", state.isEnabled, activeCount, 5))
+    entries.append(.masterInfo(theme, "Скрывает статус присутствия и активность от других пользователей."))
     
     // Features section
-    entries.append(.featuresHeader(theme, "ФУНКЦИИ"))
+    entries.append(.featuresHeader(theme, "ПАРАМЕТРЫ ПРИВАТНОСТИ"))
     entries.append(.hideReadReceipts(theme, "Не читать сообщения", state.hideReadReceipts))
     entries.append(.hideStoryViews(theme, "Не читать истории", state.hideStoryViews))
-    entries.append(.hideOnlineStatus(theme, "Не отправлять «онлайн»", state.hideOnlineStatus))
-    entries.append(.hideTypingIndicator(theme, "Не отправлять «печатает»", state.hideTypingIndicator))
-    entries.append(.forceOffline(theme, "Автоматический «офлайн»", state.forceOffline))
+    entries.append(.hideOnlineStatus(theme, "Скрывать статус «в сети»", state.hideOnlineStatus))
+    entries.append(.hideTypingIndicator(theme, "Скрывать статус «печатает»", state.hideTypingIndicator))
+    entries.append(.forceOffline(theme, "Принудительный «офлайн»", state.forceOffline))
     
     return entries
 }
@@ -331,7 +331,7 @@ public func ghostModeController(context: AccountContext) -> ViewController {
         
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("Режим призрака"),
+            title: .text("Режим невидимки"),
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back),

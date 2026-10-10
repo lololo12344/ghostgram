@@ -10,83 +10,77 @@ import AccountContext
 // MARK: - Entry Definition
 
 private enum GhostgramSettingsSection: Int32 {
-    case features
+    case privacy
+    case tools
+    case info
 }
 
 private enum GhostgramSettingsEntry: ItemListNodeEntry {
-    case deletedMessages(PresentationTheme, String, String)
+    case privacyHeader(PresentationTheme, String)
     case ghostMode(PresentationTheme, String, String)
+    case deletedMessages(PresentationTheme, String, String)
     case misc(PresentationTheme, String, String)
-    case deviceSpoof(PresentationTheme, String, String)
+    
+    case toolsHeader(PresentationTheme, String)
     case voiceMorpher(PresentationTheme, String, String)
+    case deviceSpoof(PresentationTheme, String, String)
     case sendDelay(PresentationTheme, String, String)
+    
     case info(PresentationTheme, String)
     
     var section: ItemListSectionId {
-        return GhostgramSettingsSection.features.rawValue
+        switch self {
+        case .privacyHeader, .ghostMode, .deletedMessages, .misc:
+            return GhostgramSettingsSection.privacy.rawValue
+        case .toolsHeader, .voiceMorpher, .deviceSpoof, .sendDelay:
+            return GhostgramSettingsSection.tools.rawValue
+        case .info:
+            return GhostgramSettingsSection.info.rawValue
+        }
     }
     
     var stableId: Int32 {
         switch self {
-        case .deletedMessages:
-            return 0
-        case .ghostMode:
-            return 1
-        case .misc:
-            return 2
-        case .deviceSpoof:
-            return 3
-        case .voiceMorpher:
-            return 4
-        case .sendDelay:
-            return 5
-        case .info:
-            return 6
+        case .privacyHeader: return 0
+        case .ghostMode: return 1
+        case .deletedMessages: return 2
+        case .misc: return 3
+        case .toolsHeader: return 4
+        case .voiceMorpher: return 5
+        case .deviceSpoof: return 6
+        case .sendDelay: return 7
+        case .info: return 8
         }
     }
     
     static func ==(lhs: GhostgramSettingsEntry, rhs: GhostgramSettingsEntry) -> Bool {
         switch lhs {
-        case let .deletedMessages(lhsTheme, lhsText, lhsValue):
-            if case let .deletedMessages(rhsTheme, rhsText, rhsValue) = rhs,
-               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
-                return true
-            }
+        case let .privacyHeader(lhsTheme, lhsText):
+            if case let .privacyHeader(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText { return true }
             return false
         case let .ghostMode(lhsTheme, lhsText, lhsValue):
-            if case let .ghostMode(rhsTheme, rhsText, rhsValue) = rhs,
-               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
-                return true
-            }
+            if case let .ghostMode(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
+            return false
+        case let .deletedMessages(lhsTheme, lhsText, lhsValue):
+            if case let .deletedMessages(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
             return false
         case let .misc(lhsTheme, lhsText, lhsValue):
-            if case let .misc(rhsTheme, rhsText, rhsValue) = rhs,
-               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
-                return true
-            }
+            if case let .misc(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
             return false
-        case let .deviceSpoof(lhsTheme, lhsText, lhsValue):
-            if case let .deviceSpoof(rhsTheme, rhsText, rhsValue) = rhs,
-               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
-                return true
-            }
+        case let .toolsHeader(lhsTheme, lhsText):
+            if case let .toolsHeader(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText { return true }
             return false
         case let .voiceMorpher(lhsTheme, lhsText, lhsValue):
-            if case let .voiceMorpher(rhsTheme, rhsText, rhsValue) = rhs,
-               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
-                return true
-            }
+            if case let .voiceMorpher(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
+            return false
+        case let .deviceSpoof(lhsTheme, lhsText, lhsValue):
+            if case let .deviceSpoof(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
             return false
         case let .sendDelay(lhsTheme, lhsText, lhsValue):
-            if case let .sendDelay(rhsTheme, rhsText, rhsValue) = rhs,
-               lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
-                return true
-            }
+            if case let .sendDelay(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
             return false
         case let .info(lhsTheme, lhsText):
-            if case let .info(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText {
-                return true
-            }
+            if case let .info(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText { return true }
             return false
         }
     }
@@ -98,17 +92,8 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! GhostgramSettingsControllerArguments
         switch self {
-        case let .deletedMessages(_, text, value):
-            return ItemListDisclosureItem(
-                presentationData: presentationData,
-                title: text,
-                label: value,
-                sectionId: self.section,
-                style: .blocks,
-                action: {
-                    arguments.openDeletedMessages()
-                }
-            )
+        case let .privacyHeader(_, text):
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .ghostMode(_, text, value):
             return ItemListDisclosureItem(
                 presentationData: presentationData,
@@ -118,6 +103,17 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
                 style: .blocks,
                 action: {
                     arguments.openGhostMode()
+                }
+            )
+        case let .deletedMessages(_, text, value):
+            return ItemListDisclosureItem(
+                presentationData: presentationData,
+                title: text,
+                label: value,
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    arguments.openDeletedMessages()
                 }
             )
         case let .misc(_, text, value):
@@ -131,17 +127,8 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
                     arguments.openMisc()
                 }
             )
-        case let .deviceSpoof(_, text, value):
-            return ItemListDisclosureItem(
-                presentationData: presentationData,
-                title: text,
-                label: value,
-                sectionId: self.section,
-                style: .blocks,
-                action: {
-                    arguments.openDeviceSpoof()
-                }
-            )
+        case let .toolsHeader(_, text):
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .voiceMorpher(_, text, value):
             return ItemListDisclosureItem(
                 presentationData: presentationData,
@@ -151,6 +138,17 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
                 style: .blocks,
                 action: {
                     arguments.openVoiceMorpher()
+                }
+            )
+        case let .deviceSpoof(_, text, value):
+            return ItemListDisclosureItem(
+                presentationData: presentationData,
+                title: text,
+                label: value,
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    arguments.openDeviceSpoof()
                 }
             )
         case let .sendDelay(_, text, value):
@@ -232,33 +230,34 @@ private func ghostgramSettingsControllerEntries(
     state: GhostgramSettingsState
 ) -> [GhostgramSettingsEntry] {
     var entries: [GhostgramSettingsEntry] = []
+    let theme = presentationData.theme
     
-    // Deleted Messages
-    let deletedStatus = state.deletedMessagesEnabled ? "Вкл" : "Выкл"
-    entries.append(.deletedMessages(presentationData.theme, "Удалённые сообщения", deletedStatus))
+    // Privacy Section
+    entries.append(.privacyHeader(theme, "КОНФИДЕНЦИАЛЬНОСТЬ"))
     
-    // Ghost Mode
     let ghostModeStatus = state.ghostModeEnabled ? "\(state.ghostModeActiveCount)/5" : "Выкл"
-    entries.append(.ghostMode(presentationData.theme, "Режим призрака", ghostModeStatus))
+    entries.append(.ghostMode(theme, "Режим невидимки", ghostModeStatus))
     
-    // Misc
+    let deletedStatus = state.deletedMessagesEnabled ? "Вкл" : "Выкл"
+    entries.append(.deletedMessages(theme, "Анти-удаление сообщений", deletedStatus))
+    
     let miscStatus = state.miscEnabled ? "\(state.miscActiveCount)/5" : "Выкл"
-    entries.append(.misc(presentationData.theme, "Прочее", miscStatus))
+    entries.append(.misc(theme, "Многоразовые медиа & Защита", miscStatus))
     
-    // Device Spoofing
-    let deviceSpoofStatus = state.deviceSpoofEnabled ? "Вкл" : "Выкл"
-    entries.append(.deviceSpoof(presentationData.theme, "Подмена устройства", deviceSpoofStatus))
+    // Tools Section
+    entries.append(.toolsHeader(theme, "ИНСТРУМЕНТЫ"))
     
-    // Voice Morpher
     let voiceMorpherStatus = state.voiceMorpherEnabled ? state.voiceMorpherPresetName : "Выкл"
-    entries.append(.voiceMorpher(presentationData.theme, "Голосовой двойник", voiceMorpherStatus))
+    entries.append(.voiceMorpher(theme, "Голосовой морфер", voiceMorpherStatus))
     
-    // Send Delay
+    let deviceSpoofStatus = state.deviceSpoofEnabled ? "Вкл" : "Выкл"
+    entries.append(.deviceSpoof(theme, "Подмена устройства", deviceSpoofStatus))
+    
     let sendDelayStatus = state.sendDelayEnabled ? "Вкл" : "Выкл"
-    entries.append(.sendDelay(presentationData.theme, "Отложка сообщений", sendDelayStatus))
+    entries.append(.sendDelay(theme, "Задержка отправки", sendDelayStatus))
     
     // Info
-    entries.append(.info(presentationData.theme, "Функции конфиденциальности Ghostgram. Скрытые отметки о прочтении, обход исчезающих сообщений, обход защиты от пересылки и другое."))
+    entries.append(.info(theme, "Ghostgram • Локальные функции конфиденциальности. Все настройки применяются исключительно на вашем устройстве."))
     
     return entries
 }
