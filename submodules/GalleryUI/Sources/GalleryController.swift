@@ -248,6 +248,7 @@ public func galleryItemForEntry(
         )
     } else if let file = media as? TelegramMediaFile {
         if file.isVideo {
+            let content: UniversalVideoContent
             let captureProtected: Bool
             if MiscSettingsManager.shared.shouldBypassCopyProtection || MiscSettingsManager.shared.shouldBypassPaidMedia {
                 captureProtected = false
