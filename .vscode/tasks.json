@@ -14,7 +14,7 @@
         "--features=swift.skip_function_bodies_for_derived_files",
         "--jobs=16",
         "--define=buildNumber=10000",
-        "--define=telegramVersion=12.2.2",
+        "--define=telegramVersion=12.9.2",
         "--disk_cache=${HOME}/telegram-bazel-cache",
         "-c",
         "dbg",
