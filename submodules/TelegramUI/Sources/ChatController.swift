@@ -2548,7 +2548,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     if let paidContent = media as? TelegramMediaPaidContent {
                         if MiscSettingsManager.shared.shouldBypassPaidMedia {
                             let _ = strongSelf.context.engine.messages.updateExtendedMedia(messageIds: [message.id]).startStandalone()
-                            strongSelf.controllerInteraction?.openMessage(message, OpenMessageParams(progress: nil))
+                            let _ = strongSelf.controllerInteraction?.openMessage(message._asMessage(), params ?? OpenMessageParams(mode: .default))
                             return
                         }
                         let progressSignal = Signal<Never, NoError> { _ in
