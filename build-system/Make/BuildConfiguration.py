@@ -21,7 +21,8 @@ class BuildConfiguration:
         app_specific_url_scheme,
         premium_iap_product_id,
         enable_siri,
-        enable_icloud
+        enable_icloud,
+        sg_config=""
     ):
         self.bundle_id = bundle_id
         self.api_id = api_id
@@ -35,11 +36,13 @@ class BuildConfiguration:
         self.premium_iap_product_id = premium_iap_product_id
         self.enable_siri = enable_siri
         self.enable_icloud = enable_icloud
+        self.sg_config = sg_config
 
     def write_to_variables_file(self, bazel_path, use_xcode_managed_codesigning, aps_environment, path):
         string = ''
         string += 'telegram_bazel_path = "{}"\n'.format(bazel_path)
         string += 'telegram_use_xcode_managed_codesigning = {}\n'.format('True' if use_xcode_managed_codesigning else 'False')
+        string += 'sg_config = """{}"""\n'.format(self.sg_config)
         string += 'telegram_bundle_id = "{}"\n'.format(self.bundle_id)
         string += 'telegram_api_id = "{}"\n'.format(self.api_id)
         string += 'telegram_api_hash = "{}"\n'.format(self.api_hash)
@@ -106,7 +109,8 @@ def build_configuration_from_json(path):
             app_specific_url_scheme=configuration_dict['app_specific_url_scheme'],
             premium_iap_product_id=configuration_dict['premium_iap_product_id'],
             enable_siri=configuration_dict['enable_siri'],
-            enable_icloud=configuration_dict['enable_icloud']
+            enable_icloud=configuration_dict['enable_icloud'],
+            sg_config=configuration_dict.get('sg_config', '')
         )
 
 
