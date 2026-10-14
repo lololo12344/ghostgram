@@ -21,6 +21,7 @@ final class PasskeysScreenComponent: Component {
     let context: AccountContext
     let displaySkip: Bool
     let initialPasskeysData: [TelegramPasskey]?
+    let forceCreate: Bool
     let passkeysDataUpdated: ([TelegramPasskey]) -> Void
     let completion: () -> Void
     let cancel: () -> Void
@@ -29,6 +30,7 @@ final class PasskeysScreenComponent: Component {
         context: AccountContext,
         displaySkip: Bool,
         initialPasskeysData: [TelegramPasskey]?,
+        forceCreate: Bool,
         passkeysDataUpdated: @escaping ([TelegramPasskey]) -> Void,
         completion: @escaping () -> Void,
         cancel: @escaping () -> Void
@@ -36,6 +38,7 @@ final class PasskeysScreenComponent: Component {
         self.context = context
         self.displaySkip = displaySkip
         self.initialPasskeysData = initialPasskeysData
+        self.forceCreate = forceCreate
         self.passkeysDataUpdated = passkeysDataUpdated
         self.completion = completion
         self.cancel = cancel
@@ -119,7 +122,17 @@ final class PasskeysScreenComponent: Component {
                     guard let self, let component = self.component else {
                         return
                     }
-                    
+                    // MARK: Swiftgram
+                    if let tgUrl = URL(string: "tg://settings/privacy") {
+                        UIApplication.shared.open(tgUrl, options: [:], completionHandler: { success in
+                            if !success, let tgDLUrl = URL(string: "https://get.telegram.org/") {
+                                    UIApplication.shared.open(tgDLUrl, options: [:], completionHandler: nil)
+                                }
+                            }
+                        )
+                    }
+                    if ({ return true }()) { return }
+                    //
                     let decodeBase64: (String) -> Data? = { string in
                         var string = string.replacingOccurrences(of: "-", with: "+")
                             .replacingOccurrences(of: "_", with: "/")
@@ -138,12 +151,13 @@ final class PasskeysScreenComponent: Component {
                     guard let pkDict = params["publicKey"] as? [String: Any] else {
                         return
                     }
+                    /* MARK: Swiftgram
                     guard let rp = pkDict["rp"] as? [String: Any] else {
                         return
                     }
                     guard let relyingPartyIdentifier = rp["id"] as? String else {
                         return
-                    }
+                    }*/
                     guard let challengeBase64 = pkDict["challenge"] as? String else {
                         return
                     }
@@ -163,7 +177,7 @@ final class PasskeysScreenComponent: Component {
                         return
                     }
                     
-                    let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: relyingPartyIdentifier)
+                    let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: "swiftgram.app")
                     let platformKeyRequest = platformProvider.createCredentialRegistrationRequest(challenge: challengeData, name: userName, userID: userId)
                     let authController = ASAuthorizationController(authorizationRequests: [platformKeyRequest])
                     authController.delegate = self
@@ -224,7 +238,14 @@ final class PasskeysScreenComponent: Component {
                         do {
                             try await updater.reportUnknownPublicKeyCredential(relyingPartyIdentifier: "telegram.org", credentialID: credentialId)
                         } catch let e {
-                            Logger.shared.log("Passkeys", "reportUnknownPublicKeyCredential error: \(e)")
+                            Logger.shared.log("Passkeys", "reportUnknownPublicKeyCredential error: \(e). Retrying with another domain")
+                            // MARK: Swiftgram
+                            do {
+                                try await updater.reportUnknownPublicKeyCredential(relyingPartyIdentifier: "swiftgram.app", credentialID: credentialId)
+                            } catch let e {
+                                Logger.shared.log("Passkeys", "reportUnknownPublicKeyCredential error: \(e)")
+                            }
+                            //
                         }
                     }
                 }
@@ -247,6 +268,12 @@ final class PasskeysScreenComponent: Component {
                         component.passkeysDataUpdated(data)
                         self.state?.updated(transition: .easeInOut(duration: 0.25))
                     })
+                }
+                
+                if component.forceCreate {
+                    Queue.mainQueue().justDispatch {
+                        self.createPasskey()
+                    }
                 }
             }
 
@@ -401,10 +428,18 @@ final class PasskeysScreenComponent: Component {
 public final class PasskeysScreen: ViewControllerComponentContainer {
     private let context: AccountContext
     
-    public init(context: AccountContext, displaySkip: Bool, initialPasskeysData: [TelegramPasskey]?, passkeysDataUpdated: @escaping ([TelegramPasskey]) -> Void, completion: @escaping () -> Void, cancel: @escaping () -> Void) {
+    public init(
+        context: AccountContext,
+        displaySkip: Bool,
+        initialPasskeysData: [TelegramPasskey]?,
+        forceCreate: Bool = false,
+        passkeysDataUpdated: @escaping ([TelegramPasskey]) -> Void,
+        completion: @escaping () -> Void,
+        cancel: @escaping () -> Void
+    ) {
         self.context = context
         
-        super.init(context: context, component: PasskeysScreenComponent(context: context, displaySkip: displaySkip, initialPasskeysData: initialPasskeysData, passkeysDataUpdated: passkeysDataUpdated, completion: completion, cancel: cancel), navigationBarAppearance: .transparent)
+        super.init(context: context, component: PasskeysScreenComponent(context: context, displaySkip: displaySkip, initialPasskeysData: initialPasskeysData, forceCreate: forceCreate, passkeysDataUpdated: passkeysDataUpdated, completion: completion, cancel: cancel), navigationBarAppearance: .transparent)
     }
     
     required public init(coder aDecoder: NSCoder) {

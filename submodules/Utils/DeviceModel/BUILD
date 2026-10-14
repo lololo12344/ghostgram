@@ -9,7 +9,12 @@ swift_library(
     copts = [
         "-warnings-as-errors",
     ],
-    deps = [],
+    deps = [
+# MARK: Swiftgram
+#        "//submodules/SSignalKit/SwiftSignalKit",
+#        "//submodules/LegacyComponents",
+#        "//submodules/AccountContext",
+    ],
     visibility = [
         "//visibility:public",
     ],

@@ -128,7 +128,7 @@ public class UnauthorizedAccount {
                     if let nextType = nextType {
                         parsedNextType = AuthorizationCodeNextType(apiType: nextType)
                     }
-                    if let state = transaction.getState() as? UnauthorizedAccountState, case let .payment(phoneNumber, _, _, _, _, syncContacts) = state.contents {
+                    if let state = transaction.getState() as? UnauthorizedAccountState, case let .payment(phoneNumber, _, _, _, _, _, syncContacts) = state.contents {
                         transaction.setState(UnauthorizedAccountState(isTestingEnvironment: testingEnvironment, masterDatacenterId: masterDatacenterId, contents: .confirmationCodeEntry(number: phoneNumber, type: SentAuthorizationCodeType(apiType: type), hash: phoneCodeHash, timeout: codeTimeout, nextType: parsedNextType, syncContacts: syncContacts, previousCodeEntry: nil, usePrevious: false)))
                     }
                 }).start()
@@ -139,7 +139,7 @@ public class UnauthorizedAccount {
                     let (futureAuthToken, apiUser) = (authorizationData.futureAuthToken, authorizationData.user)
                     let _ = postbox.transaction({ [weak self] transaction in
                         var syncContacts = true
-                        if let state = transaction.getState() as? UnauthorizedAccountState, case let .payment(_, _, _, _, _, syncContactsValue) = state.contents {
+                        if let state = transaction.getState() as? UnauthorizedAccountState, case let .payment(_, _, _, _, _, _, syncContactsValue) = state.contents {
                             syncContacts = syncContactsValue
                         }
 
@@ -166,7 +166,7 @@ public class UnauthorizedAccount {
                     let termsOfService = authorizationSignUpRequiredData.termsOfService
                     let _ = postbox.transaction({ [weak self] transaction in
                         if let self {
-                            if let state = transaction.getState() as? UnauthorizedAccountState, case let .payment(number, codeHash, _, _, _, syncContacts) = state.contents {
+                            if let state = transaction.getState() as? UnauthorizedAccountState, case let .payment(number, codeHash, _, _, _, _, syncContacts) = state.contents {
                                 let _ = beginSignUp(
                                     account: self,
                                     data: AuthorizationSignUpData(
@@ -917,15 +917,47 @@ public final class AccountAuxiliaryMethods {
     }
 }
 
-public struct AccountRunningImportantTasks: OptionSet {
-    public var rawValue: Int32
-    
-    public init(rawValue: Int32) {
-        self.rawValue = rawValue
+public struct AccountRunningImportantTasks: Equatable {
+    public struct TaskTypes: OptionSet {
+        public var rawValue: Int32
+        
+        public init(rawValue: Int32) {
+            self.rawValue = rawValue
+        }
+        
+        public static let other = TaskTypes(rawValue: 1 << 0)
     }
     
-    public static let other = AccountRunningImportantTasks(rawValue: 1 << 0)
-    public static let pendingMessages = AccountRunningImportantTasks(rawValue: 1 << 1)
+    public var taskTypes: TaskTypes
+    public var pendingMessageCount: Int
+    public var pendingStoryCount: Int
+    
+    public init(taskTypes: TaskTypes, pendingMessageCount: Int, pendingStoryCount: Int) {
+        self.taskTypes = taskTypes
+        self.pendingMessageCount = pendingMessageCount
+        self.pendingStoryCount = pendingStoryCount
+    }
+    
+    public func combine(with other: AccountRunningImportantTasks) -> AccountRunningImportantTasks {
+        return AccountRunningImportantTasks(
+            taskTypes: self.taskTypes.union(other.taskTypes),
+            pendingMessageCount: self.pendingMessageCount + other.pendingMessageCount,
+            pendingStoryCount: self.pendingStoryCount + other.pendingStoryCount
+        )
+    }
+    
+    public var isEmpty: Bool {
+        if !self.taskTypes.isEmpty {
+            return false
+        }
+        if self.pendingMessageCount != 0 {
+            return false
+        }
+        if self.pendingStoryCount != 0 {
+            return false
+        }
+        return true
+    }
 }
 
 public struct MasterNotificationKey: Codable {
@@ -1189,7 +1221,7 @@ public class Account {
         return self._loggedOut.get()
     }
     
-    private let _importantTasksRunning = ValuePromise<AccountRunningImportantTasks>([], ignoreRepeated: true)
+    private let _importantTasksRunning = ValuePromise<AccountRunningImportantTasks>(AccountRunningImportantTasks(taskTypes: [], pendingMessageCount: 0, pendingStoryCount: 0), ignoreRepeated: true)
     public var importantTasksRunning: Signal<AccountRunningImportantTasks, NoError> {
         return self._importantTasksRunning.get()
     }
@@ -1272,6 +1304,7 @@ public class Account {
         
         self.messageMediaPreuploadManager = MessageMediaPreuploadManager()
         self.pendingMessageManager = PendingMessageManager(network: network, postbox: postbox, accountPeerId: peerId, auxiliaryMethods: auxiliaryMethods, stateManager: self.stateManager, localInputActivityManager: self.localInputActivityManager, messageMediaPreuploadManager: self.messageMediaPreuploadManager, revalidationContext: self.mediaReferenceRevalidationContext)
+        let _ = _internal_failStaleEphemeralOutgoingMessages(postbox: postbox).start()
         if !supplementary {
             self.pendingStoryManager = PendingStoryManager(postbox: postbox, network: network, accountPeerId: peerId, stateManager: self.stateManager, messageMediaPreuploadManager: self.messageMediaPreuploadManager, revalidationContext: self.mediaReferenceRevalidationContext, auxiliaryMethods: self.auxiliaryMethods)
         } else {
@@ -1392,52 +1425,56 @@ public class Account {
         self.managedOperationsDisposable.add(managedLocalTypingActivities(activities: self.localInputActivityManager.allActivities(), postbox: self.stateManager.postbox, network: self.stateManager.network, accountPeerId: self.stateManager.accountPeerId).start())
         
         let extractedExpr1: [Signal<AccountRunningImportantTasks, NoError>] = [
-            managedSynchronizeChatInputStateOperations(postbox: self.postbox, network: self.network) |> map { inputStates in
-                if inputStates {
-                    //print("inputStates: true")
-                }
-                return inputStates ? AccountRunningImportantTasks.other : []
+            managedSynchronizeChatInputStateOperations(postbox: self.postbox, network: self.network, messageMediaPreuploadManager: self.messageMediaPreuploadManager, auxiliaryMethods: self.auxiliaryMethods) |> map { inputStates in
+                return AccountRunningImportantTasks(
+                    taskTypes: inputStates ? .other : [],
+                    pendingMessageCount: 0,
+                    pendingStoryCount: 0
+                )
             },
-            self.pendingMessageManager.hasPendingMessages |> map { hasPendingMessages in
-                if !hasPendingMessages.isEmpty {
-                    //print("hasPendingMessages: true")
-                }
-                return !hasPendingMessages.isEmpty ? AccountRunningImportantTasks.pendingMessages : []
+            self.pendingMessageManager.pendingMessageCount |> map { pendingMessageCount in
+                return AccountRunningImportantTasks(
+                    taskTypes: [],
+                    pendingMessageCount: pendingMessageCount.values.reduce(into: 0, { $0 += $1 }),
+                    pendingStoryCount: 0
+                )
             },
             (self.pendingStoryManager?.hasPending ?? .single(false)) |> map { hasPending in
-                if hasPending {
-                    //print("hasPending: true")
-                }
-                return hasPending ? AccountRunningImportantTasks.pendingMessages : []
+                return AccountRunningImportantTasks(
+                    taskTypes: [],
+                    pendingMessageCount: 0,
+                    pendingStoryCount: hasPending ? 1 : 0
+                )
             },
             self.pendingUpdateMessageManager.updatingMessageMedia |> map { updatingMessageMedia in
-                if !updatingMessageMedia.isEmpty {
-                    //print("updatingMessageMedia: true")
-                }
-                return !updatingMessageMedia.isEmpty ? AccountRunningImportantTasks.pendingMessages : []
+                return AccountRunningImportantTasks(
+                    taskTypes: [],
+                    pendingMessageCount: updatingMessageMedia.count,
+                    pendingStoryCount: 0
+                )
             },
             self.pendingPeerMediaUploadManager.uploadingPeerMedia |> map { uploadingPeerMedia in
-                if !uploadingPeerMedia.isEmpty {
-                    //print("uploadingPeerMedia: true")
-                }
-                return !uploadingPeerMedia.isEmpty ? AccountRunningImportantTasks.pendingMessages : []
+                return AccountRunningImportantTasks(
+                    taskTypes: [],
+                    pendingMessageCount: uploadingPeerMedia.count,
+                    pendingStoryCount: 0
+                )
             },
             self.accountPresenceManager.isPerformingUpdate() |> map { presenceUpdate in
-                if presenceUpdate {
-                    //print("accountPresenceManager isPerformingUpdate: true")
-                    //return []
-                }
-                return presenceUpdate ? AccountRunningImportantTasks.other : []
-            },
-            //self.notificationAutolockReportManager.isPerformingUpdate() |> map { $0 ? AccountRunningImportantTasks.other : [] }
+                return AccountRunningImportantTasks(
+                    taskTypes: presenceUpdate ? .other : [],
+                    pendingMessageCount: 0,
+                    pendingStoryCount: 0
+                )
+            }
         ]
         let extractedExpr: [Signal<AccountRunningImportantTasks, NoError>] = extractedExpr1
         let importantBackgroundOperations: [Signal<AccountRunningImportantTasks, NoError>] = extractedExpr
         let importantBackgroundOperationsRunning = combineLatest(queue: Queue(), importantBackgroundOperations)
         |> map { values -> AccountRunningImportantTasks in
-            var result: AccountRunningImportantTasks = []
+            var result: AccountRunningImportantTasks = AccountRunningImportantTasks(taskTypes: [], pendingMessageCount: 0, pendingStoryCount: 0)
             for value in values {
-                result.formUnion(value)
+                result = result.combine(with: value)
             }
             return result
         }

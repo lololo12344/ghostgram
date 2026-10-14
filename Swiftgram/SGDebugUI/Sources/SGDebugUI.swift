@@ -178,19 +178,26 @@ public func sgDebugController(context: AccountContext) -> ViewController {
             #if DEBUG
             #endif
         case .resetIAP:
-            SGSimpleSettings.shared.primaryUserId = ""
-            presentControllerImpl?(UndoOverlayController(
-                presentationData: presentationData,
-                content: .info(title: nil, text: "Status reset completed. You can now restore purchases.", timeout: nil, customUndoText: nil),
-                elevatedLayout: false,
-                action: { _ in return false }
-            ),
-            nil)
+            let updateSettingsSignal = updateSGStatusInteractively(accountManager: context.sharedContext.accountManager, { status in
+                var status = status
+                status.status = SGStatus.default.status
+                SGSimpleSettings.shared.primaryUserId = ""
+                return status
+            })
+            let _ = (updateSettingsSignal |> deliverOnMainQueue).start(next: {
+                presentControllerImpl?(UndoOverlayController(
+                    presentationData: presentationData,
+                    content: .info(title: nil, text: "Status reset completed. You can now restore purchases.", timeout: nil, customUndoText: nil),
+                    elevatedLayout: false,
+                    action: { _ in return false }
+                ),
+                nil)
+            })
         }
     })
     
-    let signal: Signal<(ItemListControllerState, (ItemListNodeState, SGItemListArguments<SGDebugToggles, AnyHashable, SGDebugOneFromManySetting, SGDebugDisclosureLink, SGDebugActions>)), NoError> = combineLatest(context.sharedContext.presentationData, simplePromise.get())
-    |> map { presentationData, _ ->  (ItemListControllerState, (ItemListNodeState, SGItemListArguments<SGDebugToggles, AnyHashable, SGDebugOneFromManySetting, SGDebugDisclosureLink, SGDebugActions>)) in
+    let signal = combineLatest(context.sharedContext.presentationData, simplePromise.get())
+    |> map { presentationData, _ ->  (ItemListControllerState, (ItemListNodeState, Any)) in
         
         let entries = SGDebugControllerEntries(presentationData: presentationData)
         
@@ -213,4 +220,5 @@ public func sgDebugController(context: AccountContext) -> ViewController {
     
     return controller
 }
+
 

@@ -1,58 +1,8 @@
-import SGSimpleSettings
 import Foundation
+import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
-
-public func stringForShortTimestamp(hours: Int32, minutes: Int32, dateTimeFormat: PresentationDateTimeFormat, formatAsPlainText: Bool = false) -> String {
-    switch dateTimeFormat.timeFormat {
-    case .regular:
-        let hourString: String
-        if hours == 0 {
-            hourString = "12"
-        } else if hours > 12 {
-            hourString = "\(hours - 12)"
-        } else {
-            hourString = "\(hours)"
-        }
-        
-        let periodString: String
-        if hours >= 12 {
-            periodString = "PM"
-        } else {
-            periodString = "AM"
-        }
-        
-        let spaceCharacter: String
-        if formatAsPlainText {
-            spaceCharacter = " "
-        } else {
-            spaceCharacter = "\u{00a0}"
-        }
-        
-        if minutes >= 10 {
-            return "\(hourString):\(minutes)\(spaceCharacter)\(periodString)"
-        } else {
-            return "\(hourString):0\(minutes)\(spaceCharacter)\(periodString)"
-        }
-    case .military:
-        return String(format: "%02d:%02d", arguments: [Int(hours), Int(minutes)])
-    }
-}
-
-public func stringForMessageTimestamp(timestamp: Int32, dateTimeFormat: PresentationDateTimeFormat, local: Bool = true) -> String {
-    var t = Int(timestamp)
-    var timeinfo = tm()
-    if local {
-        localtime_r(&t, &timeinfo)
-    } else {
-        gmtime_r(&t, &timeinfo)
-    }
-    if SGSimpleSettings.shared.secondsInMessages {
-        return stringForShortTimestampWithSeconds(hours: timeinfo.tm_hour, minutes: timeinfo.tm_min, seconds: timeinfo.tm_sec, dateTimeFormat: dateTimeFormat)
-    } else {
-        return stringForShortTimestamp(hours: timeinfo.tm_hour, minutes: timeinfo.tm_min, dateTimeFormat: dateTimeFormat)
-    }
-}
+import TextFormat
 
 public func getDateTimeComponents(timestamp: Int32) -> (day: Int32, month: Int32, year: Int32, hour: Int32, minutes: Int32) {
     var t: time_t = Int(timestamp)
@@ -226,40 +176,3 @@ public func stringForDateWithoutDayAndMonth(date: Date, timeZone: TimeZone? = Ti
     formatter.setLocalizedDateFormatFromTemplate("yyyy")
     return formatter.string(from: date)
 }
-
-// MARK: Swiftgram
-public func stringForShortTimestampWithSeconds(hours: Int32, minutes: Int32, seconds: Int32, dateTimeFormat: PresentationDateTimeFormat) -> String {
-    switch dateTimeFormat.timeFormat {
-    case .regular:
-        let hourString: String
-        if hours == 0 {
-            hourString = "12"
-        } else if hours > 12 {
-            hourString = "\(hours - 12)"
-        } else {
-            hourString = "\(hours)"
-        }
-        
-        let periodString: String
-        if hours >= 12 {
-            periodString = "PM"
-        } else {
-            periodString = "AM"
-        }
-        
-        let minuteString: String
-        if minutes >= 10 {
-            minuteString = "\(minutes)"
-        } else {
-            minuteString = "0\(minutes)"
-        }
-        if seconds >= 10 {
-            return "\(hourString):\(minuteString):\(seconds)\u{00a0}\(periodString)"
-        } else {
-            return "\(hourString):\(minuteString):0\(seconds)\u{00a0}\(periodString)"
-        }
-    case .military:
-        return String(format: "%02d:%02d:%02d", arguments: [Int(hours), Int(minutes), Int(seconds)])
-    }
-}
-//

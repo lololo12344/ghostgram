@@ -3,15 +3,15 @@ import TextFormat
 import TelegramCore
 import AccountContext
 
-public func chatTextInputAddFormattingAttribute(_ state: ChatTextInputState, attribute: NSAttributedString.Key, value: Any?) -> ChatTextInputState {
+public func chatTextInputAddFormattingAttribute(forceRemoveAll: Bool = false, _ state: ChatTextInputState, attribute: NSAttributedString.Key, value: Any?) -> ChatTextInputState {
     if !state.selectionRange.isEmpty {
         let nsRange = NSRange(location: state.selectionRange.lowerBound, length: state.selectionRange.count)
         var addAttribute = true
         var attributesToRemove: [NSAttributedString.Key] = []
         state.inputText.enumerateAttributes(in: nsRange, options: .longestEffectiveRangeNotRequired) { attributes, range, _ in
             for (key, _) in attributes {
-                if key == attribute {
-                    if nsRange == range {
+                if key == attribute || forceRemoveAll {
+                    if nsRange == range || forceRemoveAll {
                         addAttribute = false
                         attributesToRemove.append(key)
                     }
@@ -152,6 +152,57 @@ public func chatTextInputRemoveLinkAttribute(_ state: ChatTextInputState, select
         state.inputText.enumerateAttributes(in: nsRange, options: .longestEffectiveRangeNotRequired) { attributes, range, stop in
             for (key, _) in attributes {
                 if key == ChatTextInputAttributes.textUrl {
+                    attributesToRemove.append((key, range))
+                } else {
+                    attributesToRemove.append((key, nsRange))
+                }
+            }
+        }
+        
+        let result = NSMutableAttributedString(attributedString: state.inputText)
+        for (attribute, range) in attributesToRemove {
+            result.removeAttribute(attribute, range: range)
+        }
+        return ChatTextInputState(inputText: result, selectionRange: selectionRange)
+    } else {
+        return state
+    }
+}
+
+public func chatTextInputAddDateAttribute(_ state: ChatTextInputState, selectionRange: Range<Int>, date: Int32) -> ChatTextInputState {
+    if !selectionRange.isEmpty {
+        let nsRange = NSRange(location: selectionRange.lowerBound, length: selectionRange.count)
+        var linkRange = nsRange
+        var attributesToRemove: [(NSAttributedString.Key, NSRange)] = []
+        state.inputText.enumerateAttributes(in: nsRange, options: .longestEffectiveRangeNotRequired) { attributes, range, stop in
+            for (key, _) in attributes {
+                if key == ChatTextInputAttributes.date {
+                    attributesToRemove.append((key, range))
+                    linkRange = linkRange.union(range)
+                } else {
+                    attributesToRemove.append((key, nsRange))
+                }
+            }
+        }
+        
+        let result = NSMutableAttributedString(attributedString: state.inputText)
+        for (attribute, range) in attributesToRemove {
+            result.removeAttribute(attribute, range: range)
+        }
+        result.addAttribute(ChatTextInputAttributes.date, value: ChatTextInputTextDateAttribute(date: date), range: nsRange)
+        return ChatTextInputState(inputText: result, selectionRange: selectionRange)
+    } else {
+        return state
+    }
+}
+
+public func chatTextInputRemoveDateAttribute(_ state: ChatTextInputState, selectionRange: Range<Int>) -> ChatTextInputState {
+    if !selectionRange.isEmpty {
+        let nsRange = NSRange(location: selectionRange.lowerBound, length: selectionRange.count)
+        var attributesToRemove: [(NSAttributedString.Key, NSRange)] = []
+        state.inputText.enumerateAttributes(in: nsRange, options: .longestEffectiveRangeNotRequired) { attributes, range, stop in
+            for (key, _) in attributes {
+                if key == ChatTextInputAttributes.date {
                     attributesToRemove.append((key, range))
                 } else {
                     attributesToRemove.append((key, nsRange))

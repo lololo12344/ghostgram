@@ -18,6 +18,14 @@
 @end
 
 
+typedef NS_ENUM(NSUInteger, TGMediaLivePhotoMode)
+{
+    TGMediaLivePhotoModeOff = 0,
+    TGMediaLivePhotoModeLive,
+    TGMediaLivePhotoModeLoop,
+    TGMediaLivePhotoModeBounce
+};
+
 @class TGPaintingData;
 
 @protocol TGMediaEditAdjustments <NSObject>
@@ -29,6 +37,7 @@
 @property (nonatomic, readonly) CGFloat cropLockedAspectRatio;
 @property (nonatomic, readonly) bool cropMirrored;
 @property (nonatomic, readonly) bool sendAsGif;
+@property (nonatomic, readonly) bool sendAsTelescope;
 @property (nonatomic, readonly) TGPaintingData *paintingData;
 @property (nonatomic, readonly) NSDictionary *toolValues;
 
@@ -105,6 +114,12 @@
 - (void)setPrice:(NSNumber *)price forItem:(NSObject<TGMediaEditableItem> *)item;
 - (SSignal *)pricesUpdatedSignal;
 
+- (NSNumber *)livePhotoModeForItem:(NSObject<TGMediaEditableItem> *)item;
+- (SSignal *)livePhotoModeSignalForItem:(NSObject<TGMediaEditableItem> *)item;
+- (SSignal *)livePhotoModeForIdentifier:(NSString *)identifier;
+- (void)setLivePhotoMode:(TGMediaLivePhotoMode)mode forItem:(NSObject<TGMediaEditableItem> *)item;
+- (SSignal *)livePhotoModesUpdatedSignal;
+
 - (UIImage *)paintingImageForItem:(NSObject<TGMediaEditableItem> *)item;
 - (UIImage *)stillPaintingImageForItem:(NSObject<TGMediaEditableItem> *)item;
 - (bool)setPaintingData:(NSData *)data entitiesData:(NSData *)entitiesData image:(UIImage *)image stillImage:(UIImage *)stillImage forItem:(NSObject<TGMediaEditableItem> *)item dataUrl:(NSURL **)dataOutUrl entitiesDataUrl:(NSURL **)entitiesDataOutUrl imageUrl:(NSURL **)imageOutUrl forVideo:(bool)video;
@@ -117,6 +132,10 @@
 - (bool)isHighQualityPhoto;
 - (SSignal *)highQualityPhoto;
 - (void)setHighQualityPhoto:(bool)highQualityPhoto;
+
+- (bool)isForceLivePhotoEnabled;
+- (SSignal *)forceLivePhotoEnabled;
+- (void)setForceLivePhotoEnabled:(bool)forceLivePhotoEnabled;
 
 - (SSignal *)facesForItem:(NSObject<TGMediaEditableItem> *)item;
 - (void)setFaces:(NSArray *)faces forItem:(NSObject<TGMediaEditableItem> *)item;

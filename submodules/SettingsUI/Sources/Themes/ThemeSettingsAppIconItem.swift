@@ -12,12 +12,7 @@ import AppBundle
 private func generateBorderImage(theme: PresentationTheme, bordered: Bool, selected: Bool) -> UIImage? {
     return generateImage(CGSize(width: 30.0, height: 30.0), rotatedContext: { size, context in
         let bounds = CGRect(origin: CGPoint(), size: size)
-        context.setFillColor(theme.list.itemBlocksBackgroundColor.cgColor)
-        context.fill(bounds)
-        
-        context.setBlendMode(.clear)
-        context.fillEllipse(in: bounds)
-        context.setBlendMode(.normal)
+        context.clear(bounds)
         
         let lineWidth: CGFloat
         if selected {
@@ -113,8 +108,10 @@ private final class ThemeSettingsAppIconNode : ASDisplayNode {
     
     override init() {
         self.iconNode = ASImageNode()
+        self.iconNode.clipsToBounds = true
         self.iconNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 63.0, height: 63.0))
         self.iconNode.isLayerBacked = true
+        self.iconNode.cornerRadius = 15.0
         
         self.overlayNode = ASImageNode()
         self.overlayNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 63.0, height: 63.0))
@@ -182,7 +179,7 @@ private final class ThemeSettingsAppIconNode : ASDisplayNode {
         self.iconNode.frame = CGRect(origin: CGPoint(x: floorToScreenPixels((bounds.width - iconSize.width) / 2.0), y: 13.0), size: iconSize)
         self.overlayNode.frame = self.iconNode.frame
         
-        let textSize = self.textNode.updateLayout(bounds.size)
+        let textSize = self.textNode.updateLayout(CGSize(width: bounds.size.width + 8.0, height: bounds.size.height))
         let textFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((bounds.width - textSize.width) / 2.0), y: 81.0), size: textSize)
         self.textNode.frame = textFrame
         
@@ -199,6 +196,7 @@ private let selectedTextFont = Font.medium(12.0)
 
 class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
     private let backgroundNode: ASDisplayNode
+    private let highlightNode: ASDisplayNode
     private let topStripeNode: ASDisplayNode
     private let bottomStripeNode: ASDisplayNode
     private let maskNode: ASImageNode
@@ -219,6 +217,9 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
         self.backgroundNode = ASDisplayNode()
         self.backgroundNode.isLayerBacked = true
         
+        self.highlightNode = ASDisplayNode()
+        self.highlightNode.isLayerBacked = true
+        
         self.topStripeNode = ASDisplayNode()
         self.topStripeNode.isLayerBacked = true
         
@@ -234,6 +235,20 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
         self.addSubnode(self.containerNode)
     }
             
+    public func displayHighlight() {
+        if self.backgroundNode.supernode != nil {
+            self.insertSubnode(self.highlightNode, aboveSubnode: self.backgroundNode)
+        } else {
+            self.insertSubnode(self.highlightNode, at: 0)
+        }
+        
+        Queue.mainQueue().after(1.2, {
+            self.highlightNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.3, removeOnCompletion: false, completion: { _ in
+                self.highlightNode.removeFromSupernode()
+            })
+        })
+    }
+    
     func asyncLayout() -> (_ item: ThemeSettingsAppIconItem, _ params: ListViewItemLayoutParams, _ neighbors: ItemListNeighbors) -> (ListViewItemNodeLayout, () -> Void) {
         return { item, params, neighbors in
             let contentSize: CGSize
@@ -280,6 +295,7 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                     strongSelf.backgroundNode.backgroundColor = item.theme.list.itemBlocksBackgroundColor
                     strongSelf.topStripeNode.backgroundColor = item.theme.list.itemBlocksSeparatorColor
                     strongSelf.bottomStripeNode.backgroundColor = item.theme.list.itemBlocksSeparatorColor
+                    strongSelf.highlightNode.backgroundColor = item.theme.list.itemSearchHighlightColor
                     
                     if strongSelf.backgroundNode.supernode == nil {
                         strongSelf.insertSubnode(strongSelf.backgroundNode, at: 0)
@@ -321,6 +337,7 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                     strongSelf.maskNode.image = hasCorners ? PresentationResourcesItemList.cornersImage(item.theme, top: hasTopCorners, bottom: hasBottomCorners, glass: item.systemStyle == .glass) : nil
                     
                     strongSelf.backgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: params.width, height: contentSize.height + min(insets.top, separatorHeight) + min(insets.bottom, separatorHeight)))
+                    strongSelf.highlightNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: params.width, height: contentSize.height + min(insets.top, separatorHeight) + min(insets.bottom, separatorHeight)))
                     strongSelf.maskNode.frame = strongSelf.backgroundNode.frame.insetBy(dx: params.leftInset, dy: 0.0)
                     strongSelf.topStripeNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: layoutSize.width, height: separatorHeight))
                     strongSelf.bottomStripeNode.frame = CGRect(origin: CGPoint(x: bottomStripeInset, y: contentSize.height + bottomStripeOffset), size: CGSize(width: layoutSize.width - bottomStripeInset, height: separatorHeight))
@@ -359,6 +376,55 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                             var name = "Icon"
                             var bordered = true
                             switch icon.name {
+                                case "SGDefault":
+                                    name = item.strings.Appearance_AppIconDefault
+                                    bordered = false
+                                case "SGBlack":
+                                    name = "Black"
+                                    bordered = false
+                                case "SGLegacy":
+                                    name = "Legacy"
+                                    bordered = false
+                                case "SGInverted":
+                                    name = "Inverted"
+                                case "SGWhite":
+                                    name = "White"
+                                case "SGNight":
+                                    name = "Night"
+                                    bordered = false
+                                case "SGSky":
+                                    name = "Sky"
+                                    bordered = false
+                                case "SGTitanium":
+                                    name = "Titanium"
+                                    bordered = false
+                                case "SGNeon":
+                                    name = "Neon"
+                                    bordered = false
+                                case "SGNeonBlue":
+                                    name = "Neon Blue"
+                                    bordered = false
+                                case "SGGlass":
+                                    name = "Glass"
+                                    bordered = false
+                                case "SGSparkling":
+                                    name = "Sparkling"
+                                    bordered = false
+                                case "SGBeta":
+                                    name = "β Beta"
+                                    bordered = false
+                                case "SGPro":
+                                    name = "Pro"
+                                    bordered = false
+                                case "SGGold":
+                                    name = "Gold"
+                                    bordered = false
+                                case "SGDucky":
+                                    name = "Ducky"
+                                    bordered = false
+                                case "SGDay":
+                                    name = "Day"
+                                    bordered = false
                                 case "BlueIcon":
                                     name = item.strings.Appearance_AppIconDefault
                                 case "BlackIcon":
@@ -389,7 +455,7 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                                     name = icon.name
                             }
                         
-                            imageNode.setup(theme: item.theme, icon: image, title: NSAttributedString(string: name, font: selected ? selectedTextFont : textFont, textColor: selected  ? item.theme.list.itemAccentColor : item.theme.list.itemPrimaryTextColor, paragraphAlignment: .center), locked: !item.isPremium && icon.isPremium, color: item.theme.list.itemPrimaryTextColor, bordered: bordered, selected: selected, action: {
+                            imageNode.setup(theme: item.theme, icon: image, title: NSAttributedString(string: name, font: selected ? selectedTextFont : textFont, textColor: selected  ? item.theme.list.itemAccentColor : item.theme.list.itemPrimaryTextColor, paragraphAlignment: .center), locked: !item.isPremium && icon.isSGPro, color: item.theme.list.itemPrimaryTextColor, bordered: bordered, selected: selected, action: {
                                 item.updated(icon)
                             })
                         }

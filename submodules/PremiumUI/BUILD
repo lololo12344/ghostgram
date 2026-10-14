@@ -48,6 +48,10 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+sgdeps = [
+    "//Swiftgram/SGStrings:SGStrings"
+]
+
 swift_library(
     name = "PremiumUI",
     module_name = "PremiumUI",
@@ -60,7 +64,7 @@ swift_library(
     data = [
         ":PremiumUIBundle",
     ],
-    deps = [
+    deps = sgdeps + [
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/AsyncDisplayKit:AsyncDisplayKit",
         "//submodules/Display:Display",
@@ -91,7 +95,8 @@ swift_library(
         "//submodules/Components/ViewControllerComponent:ViewControllerComponent",
         "//submodules/Components/MultilineTextComponent:MultilineTextComponent",
         "//submodules/Components/MultilineTextWithEntitiesComponent:MultilineTextWithEntitiesComponent",
-        "//submodules/Components/SheetComponent:SheetComponent",
+        "//submodules/Components/SheetComponent",
+        "//submodules/Components/ResizableSheetComponent",
         "//submodules/Components/BundleIconComponent:BundleIconComponent",
         "//submodules/Components/SolidRoundedButtonComponent:SolidRoundedButtonComponent",
         "//submodules/Components/BlurredBackgroundComponent:BlurredBackgroundComponent",

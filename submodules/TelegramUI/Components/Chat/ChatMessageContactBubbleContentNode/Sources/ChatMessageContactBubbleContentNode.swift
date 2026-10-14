@@ -3,7 +3,6 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import AvatarNode
@@ -112,9 +111,9 @@ public class ChatMessageContactBubbleContentNode: ChatMessageBubbleContentNode {
             }
             
             
-            var contactPeer: Peer?
+            var contactPeer: EnginePeer?
             if let peerId = selectedContact?.peerId, let peer = item.message.peers[peerId] {
-                contactPeer = peer
+                contactPeer = EnginePeer(peer)
             }
             
             let nameColors: PeerNameColors.Colors?
@@ -260,7 +259,7 @@ public class ChatMessageContactBubbleContentNode: ChatMessageBubbleContentNode {
                     }
                 }
                 
-                let dateText = stringForMessageTimestampStatus(accountPeerId: item.context.account.peerId, message: item.message, dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, associatedData: item.associatedData)
+                let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, associatedData: item.associatedData)
                 
                 let statusType: ChatMessageDateAndStatusType?
                 if case .customChatContents = item.associatedData.subject {
@@ -298,11 +297,10 @@ public class ChatMessageContactBubbleContentNode: ChatMessageBubbleContentNode {
                         context: item.context,
                         presentationData: item.presentationData,
                         edited: edited,
-                        isDeleted: item.topMessage.ghostgramIsDeleted,
                         impressionCount: viewCount,
                         dateText: dateText,
                         type: statusType,
-                        layoutInput: .trailingContent(contentWidth: 1000.0, reactionSettings: shouldDisplayInlineDateReactions(message: item.message, isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.TrailingReactionSettings(displayInline: true, preferAdditionalInset: false) : nil),
+                        layoutInput: .trailingContent(contentWidth: 1000.0, reactionSettings: shouldDisplayInlineDateReactions(message: EngineMessage(item.message), isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.TrailingReactionSettings(displayInline: true, preferAdditionalInset: false) : nil),
                         constrainedSize: CGSize(width: constrainedSize.width - sideInsets, height: .greatestFiniteMagnitude),
                         availableReactions: item.associatedData.availableReactions,
                         savedMessageTags: item.associatedData.savedMessageTags,
@@ -316,7 +314,7 @@ public class ChatMessageContactBubbleContentNode: ChatMessageBubbleContentNode {
                         starsCount: starsCount,
                         isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && isReplyThread,
                         hasAutoremove: item.message.isSelfExpiring,
-                        canViewReactionList: canViewMessageReactionList(message: item.topMessage),
+                        canViewReactionList: canViewMessageReactionList(message: EngineMessage(item.topMessage)),
                         animationCache: item.controllerInteraction.presentationContext.animationCache,
                         animationRenderer: item.controllerInteraction.presentationContext.animationRenderer
                     ))
@@ -485,7 +483,7 @@ public class ChatMessageContactBubbleContentNode: ChatMessageBubbleContentNode {
                                 pattern = MessageInlineBlockBackgroundView.Pattern(
                                     context: item.context,
                                     fileId: backgroundEmojiId,
-                                    file: item.message.associatedMedia[MediaId(
+                                    file: item.message.associatedMedia[EngineMedia.Id(
                                         namespace: Namespaces.Media.CloudFile,
                                         id: backgroundEmojiId
                                     )] as? TelegramMediaFile

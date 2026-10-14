@@ -117,6 +117,7 @@
     bool _downloaded;
     
     bool _sendAsGif;
+    bool _sendAsTelescope;
     bool _autoplayed;
     
     CMTime _chaseTime;
@@ -284,7 +285,7 @@
     if (_volumeOverlayFixView != nil)
         return;
     
-    UIWindow *keyWindow = self.window; //[UIApplication sharedApplication].keyWindow;
+    UIWindow *keyWindow = self.window;
     UIView *rootView = keyWindow.rootViewController.view;
     
     if (iosMajorVersion() < 13) {
@@ -427,10 +428,6 @@
     
     if (itemChanged) {
         [self _playerCleanup];
-     
-        if (!item.asFile) {
-            [_facesDisposable setDisposable:[[TGPaintFaceDetector detectFacesInItem:item.editableMediaItem editingContext:item.editingContext] startStrictWithNext:nil file:__FILE_NAME__ line:__LINE__]];
-        }
     }
     
     _scrubberView.allowsTrimming = false;
@@ -517,9 +514,10 @@
             
             id<TGMediaEditAdjustments> baseAdjustments = [strongSelf.item.editingContext adjustmentsForItem:strongSelf.item.editableMediaItem];
             strongSelf->_sendAsGif = baseAdjustments.sendAsGif;
+            strongSelf->_sendAsTelescope = baseAdjustments.sendAsTelescope;
             [strongSelf _mutePlayer:baseAdjustments.sendAsGif];
             
-            if (baseAdjustments.sendAsGif || ([strongSelf itemIsLivePhoto]))
+            if (baseAdjustments.sendAsGif)
                 [strongSelf setPlayButtonHidden:true animated:false];
             
             [strongSelf->_entitiesView setupWithEntitiesData:adjustments.paintingData.entitiesData];
@@ -1544,7 +1542,7 @@
     }
 }
 
-- (void)toggleSendAsGif
+- (void)toggleSendAsGif:(bool)showTooltip
 {
     TGVideoEditAdjustments *adjustments = (TGVideoEditAdjustments *)[self.item.editingContext adjustmentsForItem:self.item.editableMediaItem];
     CGSize videoFrameSize = _videoDimensions;
@@ -1564,31 +1562,34 @@
     }
     
     bool sendAsGif = !adjustments.sendAsGif;
-    TGVideoEditAdjustments *updatedAdjustments = [TGVideoEditAdjustments editAdjustmentsWithOriginalSize:_videoDimensions cropRect:cropRect cropOrientation:adjustments.cropOrientation cropRotation:adjustments.cropRotation cropLockedAspectRatio:adjustments.cropLockedAspectRatio cropMirrored:adjustments.cropMirrored trimStartValue:trimStartValue trimEndValue:trimEndValue toolValues:adjustments.toolValues paintingData:adjustments.paintingData sendAsGif:sendAsGif preset:adjustments.preset];
+    
+    TGVideoEditAdjustments *updatedAdjustments = [TGVideoEditAdjustments editAdjustmentsWithOriginalSize:_videoDimensions cropRect:cropRect cropOrientation:adjustments.cropOrientation cropRotation:adjustments.cropRotation cropLockedAspectRatio:adjustments.cropLockedAspectRatio cropMirrored:adjustments.cropMirrored trimStartValue:trimStartValue trimEndValue:trimEndValue toolValues:adjustments.toolValues paintingData:adjustments.paintingData sendAsGif:sendAsGif sendAsTelescope:false preset:adjustments.preset];
     [self.item.editingContext setAdjustments:updatedAdjustments forItem:self.item.editableMediaItem];
     
     [_editableItemVariable set:[SSignal single:[self editableMediaItem]]];
     
     if (sendAsGif)
     {
-        if (UIInterfaceOrientationIsPortrait([[LegacyComponentsGlobals provider] applicationStatusBarOrientation]))
-        {
-            UIView *parentView = [self.delegate itemViewDidRequestInterfaceView:self];
-            
-            _tooltipContainerView = [[TGMenuContainerView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, parentView.frame.size.width, parentView.frame.size.height)];
-            [parentView addSubview:_tooltipContainerView];
-            
-            NSMutableArray *actions = [[NSMutableArray alloc] init];
-            NSString *text = [self itemIsLivePhoto] ? TGLocalized(@"MediaPicker.LivePhotoDescription") : TGLocalized(@"MediaPicker.VideoMuteDescription");
-            [actions addObject:@{@"title":text}];
-            _tooltipContainerView.menuView.forceArrowOnTop = false;
-            _tooltipContainerView.menuView.multiline = true;
-            [_tooltipContainerView.menuView setButtonsAndActions:actions watcherHandle:nil];
-            _tooltipContainerView.menuView.buttonHighlightDisabled = true;
-            [_tooltipContainerView.menuView sizeToFit];
-        
-            CGRect iconViewFrame = CGRectMake(12, self.frame.size.height - 192.0 - _safeAreaInset.bottom, 40, 40);
-            [_tooltipContainerView showMenuFromRect:iconViewFrame animated:false];
+        if (showTooltip) {
+            if (UIInterfaceOrientationIsPortrait([[LegacyComponentsGlobals provider] applicationStatusBarOrientation]))
+            {
+                UIView *parentView = [self.delegate itemViewDidRequestInterfaceView:self];
+                
+                _tooltipContainerView = [[TGMenuContainerView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, parentView.frame.size.width, parentView.frame.size.height)];
+                [parentView addSubview:_tooltipContainerView];
+                
+                NSMutableArray *actions = [[NSMutableArray alloc] init];
+                NSString *text = TGLocalized(@"MediaPicker.VideoMuteDescription");
+                [actions addObject:@{@"title":text}];
+                _tooltipContainerView.menuView.forceArrowOnTop = false;
+                _tooltipContainerView.menuView.multiline = true;
+                [_tooltipContainerView.menuView setButtonsAndActions:actions watcherHandle:nil];
+                _tooltipContainerView.menuView.buttonHighlightDisabled = true;
+                [_tooltipContainerView.menuView sizeToFit];
+                
+                CGRect iconViewFrame = CGRectMake(12, self.frame.size.height - 192.0 - _safeAreaInset.bottom, 40, 40);
+                [_tooltipContainerView showMenuFromRect:iconViewFrame animated:false];
+            }
         }
         
         if (!self.isPlaying)
@@ -1596,6 +1597,90 @@
     }
     
     [self _mutePlayer:sendAsGif];
+}
+
+- (void)toggleSendAsTelescope:(bool)canSendAsTelescope dismissParent:(CompletionBlock)dismissParent;
+{
+    TGVideoEditAdjustments *adjustments = (TGVideoEditAdjustments *)[self.item.editingContext adjustmentsForItem:self.item.editableMediaItem];
+    CGSize videoFrameSize = _videoDimensions;
+    CGRect cropRect = CGRectMake(0, 0, videoFrameSize.width, videoFrameSize.height);
+    NSTimeInterval trimStartValue = 0.0;
+    NSTimeInterval trimEndValue = _videoDuration;
+    if (adjustments != nil)
+    {
+        videoFrameSize = adjustments.cropRect.size;
+        cropRect = adjustments.cropRect;
+        
+        if (fabs(adjustments.trimEndValue - adjustments.trimStartValue) > DBL_EPSILON)
+        {
+            trimStartValue = adjustments.trimStartValue;
+            trimEndValue = adjustments.trimEndValue;
+        }
+    }
+    
+    bool sendAsTelescope = !adjustments.sendAsTelescope;
+    if (canSendAsTelescope) {
+        TGVideoEditAdjustments *updatedAdjustments = [TGVideoEditAdjustments editAdjustmentsWithOriginalSize:_videoDimensions cropRect:cropRect cropOrientation:adjustments.cropOrientation cropRotation:adjustments.cropRotation cropLockedAspectRatio:adjustments.cropLockedAspectRatio cropMirrored:adjustments.cropMirrored trimStartValue:trimStartValue trimEndValue:trimEndValue toolValues:adjustments.toolValues paintingData:adjustments.paintingData sendAsGif:false sendAsTelescope:sendAsTelescope preset:adjustments.preset];
+        [self.item.editingContext setAdjustments:updatedAdjustments forItem:self.item.editableMediaItem];
+
+        [_editableItemVariable set:[SSignal single:[self editableMediaItem]]];
+    }
+    
+    if (sendAsTelescope)
+    {
+        UIView *parentView = [self.delegate itemViewDidRequestInterfaceView:self];
+        if (!canSendAsTelescope) {
+            UIViewController *parentViewController = [self.delegate parentControllerForPresentation];
+            if (parentViewController) {
+                // Define the URL
+                NSURL *url = [NSURL URLWithString:@"sg://resolve?domain=TelescopyBot&start=sgconvertdemo"];
+                // Create UIAlertController
+                UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"Convert in @TelescopyBot" message:@"by Swiftgram" preferredStyle:UIAlertControllerStyleAlert];
+                // Add an OK action with a handler to open the URL and then dismiss the parent view controller
+                UIAlertAction *okAction = [UIAlertAction actionWithTitle:TGLocalized(@"WebApp.OpenBot") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                    // Check if the URL can be opened
+                    if ([[UIApplication sharedApplication] canOpenURL:url]) {
+                        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+                    }
+                    
+                    if (dismissParent) {
+                        dismissParent();
+                    }
+                }];
+                [alertController addAction:okAction];
+                // Add a Cancel action
+                UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:TGLocalized(@"Common.Cancel") style:UIAlertActionStyleCancel handler:nil];
+                [alertController addAction:cancelAction];
+                // Present the alertController
+                [parentViewController presentViewController:alertController animated:YES completion:nil];
+            }
+
+            return;
+        }
+
+        if (UIInterfaceOrientationIsPortrait([[LegacyComponentsGlobals provider] applicationStatusBarOrientation]))
+        {
+            _tooltipContainerView = [[TGMenuContainerView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, parentView.frame.size.width, parentView.frame.size.height)];
+            [parentView addSubview:_tooltipContainerView];
+            
+            NSMutableArray *actions = [[NSMutableArray alloc] init];
+            NSString *text = @"Send as Round Video (Telescope),\n60 seconds limit.";
+            [actions addObject:@{@"title":text}];
+            _tooltipContainerView.menuView.forceArrowOnTop = false;
+            _tooltipContainerView.menuView.multiline = true;
+            [_tooltipContainerView.menuView setButtonsAndActions:actions watcherHandle:nil];
+            _tooltipContainerView.menuView.buttonHighlightDisabled = true;
+            [_tooltipContainerView.menuView sizeToFit];
+        
+            CGRect iconViewFrame = CGRectMake(12 * 4 + 5, self.frame.size.height - 192.0 - _safeAreaInset.bottom, 40, 40);
+            [_tooltipContainerView showMenuFromRect:iconViewFrame animated:false];
+        }
+        
+        if (!self.isPlaying)
+            [self play];
+    }
+    
+    [self _mutePlayer:false];
 }
 
 - (void)_mutePlayer:(bool)mute
@@ -1657,7 +1742,7 @@
         UIImageOrientation cropOrientation = (adjustments != nil) ? adjustments.cropOrientation : UIImageOrientationUp;
         CGFloat cropLockedAspectRatio = (adjustments != nil) ? adjustments.cropLockedAspectRatio : 0.0f;
         
-        TGVideoEditAdjustments *updatedAdjustments = [TGVideoEditAdjustments editAdjustmentsWithOriginalSize:_videoDimensions cropRect:cropRect cropOrientation:cropOrientation cropRotation:adjustments.cropRotation cropLockedAspectRatio:cropLockedAspectRatio cropMirrored:adjustments.cropMirrored trimStartValue:_scrubberView.trimStartValue trimEndValue:_scrubberView.trimEndValue toolValues:adjustments.toolValues paintingData:adjustments.paintingData sendAsGif:adjustments.sendAsGif preset:adjustments.preset];
+        TGVideoEditAdjustments *updatedAdjustments = [TGVideoEditAdjustments editAdjustmentsWithOriginalSize:_videoDimensions cropRect:cropRect cropOrientation:cropOrientation cropRotation:adjustments.cropRotation cropLockedAspectRatio:cropLockedAspectRatio cropMirrored:adjustments.cropMirrored trimStartValue:_scrubberView.trimStartValue trimEndValue:_scrubberView.trimEndValue toolValues:adjustments.toolValues paintingData:adjustments.paintingData sendAsGif:adjustments.sendAsGif sendAsTelescope:adjustments.sendAsTelescope preset:adjustments.preset];
         
         [self.item.editingContext setAdjustments:updatedAdjustments forItem:self.item.editableMediaItem];
     }

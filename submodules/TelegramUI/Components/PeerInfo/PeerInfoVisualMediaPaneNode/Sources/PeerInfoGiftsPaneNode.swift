@@ -4,7 +4,6 @@ import Display
 import ComponentFlow
 import TelegramCore
 import SwiftSignalKit
-import Postbox
 import TelegramPresentationData
 import PresentationDataUtils
 import AccountContext
@@ -24,6 +23,7 @@ import PeerInfoPaneNode
 import GiftItemComponent
 import PlainButtonComponent
 import GiftViewScreen
+import GiftUnpinScreen
 import ButtonComponent
 import UndoUI
 import CheckComponent
@@ -67,7 +67,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
     }
     
     private let context: AccountContext
-    private let peerId: PeerId
+    private let peerId: EnginePeer.Id
     private let profileGiftsCollections: ProfileGiftsCollectionsContext
     private let profileGifts: ProfileGiftsContext
     private let canManage: Bool
@@ -131,7 +131,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
     
     private let collectionsMaxCount: Int
     
-    public init(context: AccountContext, peerId: PeerId, chatControllerInteraction: ChatControllerInteraction, profileGiftsCollections: ProfileGiftsCollectionsContext, profileGifts: ProfileGiftsContext, canManage: Bool, canGift: Bool, initialGiftCollectionId: Int64?) {
+    public init(context: AccountContext, peerId: EnginePeer.Id, chatControllerInteraction: ChatControllerInteraction, profileGiftsCollections: ProfileGiftsCollectionsContext, profileGifts: ProfileGiftsContext, canManage: Bool, canGift: Bool, initialGiftCollectionId: Int64?) {
         self.context = context
         self.peerId = peerId
         self.chatControllerInteraction = chatControllerInteraction
@@ -212,6 +212,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         
         self.scrollNode.view.contentInsetAdjustmentBehavior = .never
         self.scrollNode.view.delegate = self
+        self.scrollNode.view.scrollsToTop = false
         
         if let tabSelectorView = self.tabSelector.view {
             self.scrollNode.view.insertSubview(self.giftsListView, aboveSubview: tabSelectorView)
@@ -346,7 +347,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         }
     }
     
-    public func ensureMessageIsVisible(id: MessageId) {
+    public func ensureMessageIsVisible(id: EngineMessage.Id) {
     }
     
     public func scrollToTop() -> Bool {
@@ -566,7 +567,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
             })))
         }
         
-        let contextController = ContextController(
+        let contextController = makeContextController(
             presentationData: params.presentationData,
             source: .extracted(GiftsExtractedContentSource(sourceNode: sourceNode)),
             items: .single(ContextController.Items(content: .list(items))),
@@ -774,16 +775,16 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
             var buttonIconName: String?
             if self.peerId == self.context.account.peerId {
                 if case .all = self.currentCollection {
-                    buttonTitle = params.presentationData.strings.PeerInfo_Gifts_Send
+                    buttonTitle = "Telegram Gifts"
                 } else {
                     buttonTitle = params.presentationData.strings.PeerInfo_Gifts_AddGiftsButton
                     buttonIconName = "Item List/AddItemIcon"
                 }
             } else {
-                buttonTitle = params.presentationData.strings.PeerInfo_Gifts_SendGift
+                buttonTitle = "Telegram Gifts"
             }
             
-            let buttonAttributedString = NSAttributedString(string: buttonTitle, font: Font.semibold(17.0), textColor: .white, paragraphAlignment: .center)
+            let buttonAttributedString = NSAttributedString(string: buttonTitle, font: Font.semibold(17.0), textColor: presentationData.theme.list.itemCheckColors.foregroundColor, paragraphAlignment: .center)
             var buttonTitleContent: AnyComponent<Empty> = AnyComponent(MultilineTextComponent(text: .plain(buttonAttributedString)))
             if let buttonIconName {
                 buttonTitleContent = AnyComponent(HStack([
@@ -988,7 +989,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         
         var items: [ContextMenuItem] = []
         if canManage {
-            let addToCollectionItem: ContextMenuActionItem = ContextMenuActionItem(text: strings.PeerInfo_Gifts_Context_AddToCollection, textLayout: .twoLinesMax, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/AddToCollection"), color: theme.contextMenu.primaryColor) }, action: { [weak self] c, f in
+            items.append(.action(ContextMenuActionItem(text: strings.PeerInfo_Gifts_Context_AddToCollection, textLayout: .twoLinesMax, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/AddToCollection"), color: theme.contextMenu.primaryColor) }, action: { [weak self] c, f in
                 var subItems: [ContextMenuItem] = []
                 
                 subItems.append(.action(ContextMenuActionItem(text: strings.Common_Back, textColor: .primary, icon: { theme in
@@ -1032,7 +1033,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
                         let isAdded = gift.collectionIds?.contains(collection.id) ?? false
                         
                         subItems.append(.action(ContextMenuActionItem(text: title, entities: entities, entityFiles: entityFiles, enableEntityAnimations: false, icon: { theme in
-                            return entities.isEmpty ? generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/Collection"), color: theme.contextMenu.primaryColor) : (isAdded ? generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor) : nil)
+                            return entities.isEmpty ? generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/Collection"), color: theme.contextMenu.primaryColor) : (isAdded ? generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor) : UIImage())
                         }, iconPosition: collection.icon == nil ? .left : .right, action: { [weak self] _, f in
                             f(.default)
                             
@@ -1089,8 +1090,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
                 }
                 
                 c?.pushItems(items: .single(ContextController.Items(content: .list(subItems))))
-            })
-            items.append(.action(addToCollectionItem))
+            })))
             items.append(.separator)
         }
         
@@ -1202,72 +1202,74 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
                     let context = self.context
                     let shareController = context.sharedContext.makeShareController(
                         context: context,
-                        subject: .url(link),
-                        forceExternal: false,
-                        shareStory: { [weak self] in
-                            guard let self, let parentController = self.parentController else {
-                                return
-                            }
-                            Queue.mainQueue().after(0.15) {
-                                let controller = self.context.sharedContext.makeStorySharingScreen(context: self.context, subject: .gift(gift), parentController: parentController)
-                                parentController.push(controller)
-                            }
-                        },
-                        enqueued: { [weak self] peerIds, _ in
-                            let _ = (context.engine.data.get(
-                                EngineDataList(
-                                    peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)
+                        params: ShareControllerParams(
+                            subject: .url(link),
+                            externalShare: false,
+                            actionCompleted: { [weak self] in
+                                self?.parentController?.present(UndoOverlayController(presentationData: presentationData, content: .linkCopied(title: nil, text: presentationData.strings.Conversation_LinkCopied), elevatedLayout: true, animateInAsReplacement: false, action: { _ in return false }), in: .current)
+                            },
+                            enqueued: { [weak self] peerIds, _ in
+                                let _ = (context.engine.data.get(
+                                    EngineDataList(
+                                        peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)
+                                    )
                                 )
-                            )
-                            |> deliverOnMainQueue).startStandalone(next: { [weak self] peerList in
+                                |> deliverOnMainQueue).startStandalone(next: { [weak self] peerList in
+                                    guard let self, let parentController = self.parentController else {
+                                        return
+                                    }
+
+                                    let peers = peerList.compactMap { $0 }
+                                    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                                    let text: String
+                                    var savedMessages = false
+                                    if peerIds.count == 1, let peerId = peerIds.first, peerId == context.account.peerId {
+                                        text = presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One
+                                        savedMessages = true
+                                    } else {
+                                        if peers.count == 1, let peer = peers.first {
+                                            var peerName = peer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                                            peerName = peerName.replacingOccurrences(of: "**", with: "")
+                                            text = presentationData.strings.Conversation_ForwardTooltip_Chat_One(peerName).string
+                                        } else if peers.count == 2, let firstPeer = peers.first, let secondPeer = peers.last {
+                                            var firstPeerName = firstPeer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : firstPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                                            firstPeerName = firstPeerName.replacingOccurrences(of: "**", with: "")
+                                            var secondPeerName = secondPeer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : secondPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                                            secondPeerName = secondPeerName.replacingOccurrences(of: "**", with: "")
+                                            text = presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(firstPeerName, secondPeerName).string
+                                        } else if let peer = peers.first {
+                                            var peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                                            peerName = peerName.replacingOccurrences(of: "**", with: "")
+                                            text = presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(peerName, "\(peers.count - 1)").string
+                                        } else {
+                                            text = ""
+                                        }
+                                    }
+
+                                    parentController.present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: true, animateInAsReplacement: false, action: { [weak self] action in
+                                        if savedMessages, action == .info {
+                                            let _ = (context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: context.account.peerId))
+                                            |> deliverOnMainQueue).start(next: { [weak self] peer in
+                                                guard let peer, let navigationController = self?.parentController?.navigationController as? NavigationController else {
+                                                    return
+                                                }
+                                                context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, chatController: nil, context: context, chatLocation: .peer(peer), subject: nil, botStart: nil, updateTextInputState: nil, keepStack: .always, useExisting: true, purposefulAction: nil, scrollToEndIfExists: false, activateMessageSearch: nil, animated: true))
+                                            })
+                                        }
+                                        return false
+                                    }, additionalView: nil), in: .current)
+                                })
+                            },
+                            shareStory: { [weak self] in
                                 guard let self, let parentController = self.parentController else {
                                     return
                                 }
-                                
-                                let peers = peerList.compactMap { $0 }
-                                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                                let text: String
-                                var savedMessages = false
-                                if peerIds.count == 1, let peerId = peerIds.first, peerId == context.account.peerId {
-                                    text = presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One
-                                    savedMessages = true
-                                } else {
-                                    if peers.count == 1, let peer = peers.first {
-                                        var peerName = peer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
-                                        peerName = peerName.replacingOccurrences(of: "**", with: "")
-                                        text = presentationData.strings.Conversation_ForwardTooltip_Chat_One(peerName).string
-                                    } else if peers.count == 2, let firstPeer = peers.first, let secondPeer = peers.last {
-                                        var firstPeerName = firstPeer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : firstPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
-                                        firstPeerName = firstPeerName.replacingOccurrences(of: "**", with: "")
-                                        var secondPeerName = secondPeer.id == context.account.peerId ? presentationData.strings.DialogList_SavedMessages : secondPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
-                                        secondPeerName = secondPeerName.replacingOccurrences(of: "**", with: "")
-                                        text = presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(firstPeerName, secondPeerName).string
-                                    } else if let peer = peers.first {
-                                        var peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
-                                        peerName = peerName.replacingOccurrences(of: "**", with: "")
-                                        text = presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(peerName, "\(peers.count - 1)").string
-                                    } else {
-                                        text = ""
-                                    }
+                                Queue.mainQueue().after(0.15) {
+                                    let controller = self.context.sharedContext.makeStorySharingScreen(context: self.context, subject: .gift(gift), parentController: parentController)
+                                    parentController.push(controller)
                                 }
-                                
-                                parentController.present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: savedMessages, text: text), elevatedLayout: true, animateInAsReplacement: false, action: { [weak self] action in
-                                    if savedMessages, action == .info {
-                                        let _ = (context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: context.account.peerId))
-                                        |> deliverOnMainQueue).start(next: { [weak self] peer in
-                                            guard let peer, let navigationController = self?.parentController?.navigationController as? NavigationController else {
-                                                return
-                                            }
-                                            context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, chatController: nil, context: context, chatLocation: .peer(peer), subject: nil, botStart: nil, updateTextInputState: nil, keepStack: .always, useExisting: true, purposefulAction: nil, scrollToEndIfExists: false, activateMessageSearch: nil, animated: true))
-                                        })
-                                    }
-                                    return false
-                                }, additionalView: nil), in: .current)
-                            })
-                        },
-                        actionCompleted: { [weak self] in
-                            self?.parentController?.present(UndoOverlayController(presentationData: presentationData, content: .linkCopied(title: nil, text: presentationData.strings.Conversation_LinkCopied), elevatedLayout: true, animateInAsReplacement: false, action: { _ in return false }), in: .current)
-                        }
+                            }
+                        )
                     )
                     self.parentController?.present(shareController, in: .window(.root))
                 })
@@ -1275,7 +1277,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         }
         
         if canManage {
-            let toggleVisibilityItem: ContextMenuActionItem = ContextMenuActionItem(text: gift.savedToProfile ? strings.PeerInfo_Gifts_Context_Hide : strings.PeerInfo_Gifts_Context_Show, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: gift.savedToProfile ? "Peer Info/HideIcon" : "Peer Info/ShowIcon"), color: theme.contextMenu.primaryColor) }, action: { [weak self] c, f in
+            items.append(.action(ContextMenuActionItem(text: gift.savedToProfile ? strings.PeerInfo_Gifts_Context_Hide : strings.PeerInfo_Gifts_Context_Show, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: gift.savedToProfile ? "Peer Info/HideIcon" : "Peer Info/ShowIcon"), color: theme.contextMenu.primaryColor) }, action: { [weak self] c, f in
                 c?.dismiss(completion: { [weak self] in
                     guard let self else {
                         return
@@ -1317,8 +1319,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
                         }
                     }
                 })
-            })
-            items.append(.action(toggleVisibilityItem))
+            })))
             
             if case let .unique(uniqueGift) = gift.gift {
                 items.append(.action(ContextMenuActionItem(text: strings.PeerInfo_Gifts_Context_Transfer, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Peer Info/TransferIcon"), color: theme.contextMenu.primaryColor) }, action: { [weak self] c, f in
@@ -1376,7 +1377,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         }
         
         if canManage, case let .collection(id) = self.currentCollection {
-            let removeFromCollectionItem: ContextMenuActionItem = ContextMenuActionItem(text: strings.PeerInfo_Gifts_Context_RemoveFromCollection, textColor: .destructive, textLayout: .twoLinesMax, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/RemoveFromCollection"), color: theme.contextMenu.destructiveColor) }, action: { [weak self] c, f in
+            items.append(.action(ContextMenuActionItem(text: strings.PeerInfo_Gifts_Context_RemoveFromCollection, textColor: .destructive, textLayout: .twoLinesMax, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Peer Info/Gifts/RemoveFromCollection"), color: theme.contextMenu.destructiveColor) }, action: { [weak self] c, f in
                 f(.default)
                 
                 guard let self else {
@@ -1417,8 +1418,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
                     )
                     self.parentController?.present(undoController, in: .current)
                 }
-            })
-            items.append(.action(removeFromCollectionItem))
+            })))
         }
         
         guard !items.isEmpty else {
@@ -1426,7 +1426,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         }
         
         let previewController = GiftContextPreviewController(context: self.context, gift: gift)
-        let contextController = ContextController(
+        let contextController = makeContextController(
             context: self.context,
             presentationData: currentParams.presentationData,
             source: .controller(ContextControllerContentSourceImpl(controller: previewController, sourceView: view)),
@@ -1456,7 +1456,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
         self.updateScrolling(transition: ComponentTransition(transition))
     }
     
-    public func findLoadedMessage(id: MessageId) -> Message? {
+    public func findLoadedMessage(id: EngineMessage.Id) -> EngineMessage? {
         return nil
     }
     
@@ -1472,7 +1472,7 @@ public final class PeerInfoGiftsPaneNode: ASDisplayNode, PeerInfoPaneNode, UIScr
     public func cancelPreviewGestures() {
     }
     
-    public func transitionNodeForGallery(messageId: MessageId, media: Media) -> (ASDisplayNode, CGRect, () -> (UIView?, UIView?))? {
+    public func transitionNodeForGallery(messageId: EngineMessage.Id, media: EngineMedia) -> (ASDisplayNode, CGRect, () -> (UIView?, UIView?))? {
         return nil
     }
     

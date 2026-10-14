@@ -125,15 +125,16 @@ struct SessionBackupManagerView: View {
         
         wrapperController?.present(controller, in: .window(.root), with: nil)
         
-        let _ = (combineLatest(signal, signal2)
-        |> take(1)
-        |> deliverOnMainQueue).start(next: { view, accountsWithInfo in
-            backupSessionsFromView(view, accountsWithInfo: accountsWithInfo.1)
-            withAnimation {
-                sessions = getBackedSessions()
+        Task {
+            if let result = try? await combineLatest(signal, signal2).awaitable() {
+                let (view, accountsWithInfo) = result
+                backupSessionsFromView(view, accountsWithInfo: accountsWithInfo.1)
+                withAnimation {
+                    sessions = getBackedSessions()
+                }
+                controller.dismiss()
             }
-            controller.dismiss()
-        })
+        }
         
     }
     
@@ -472,12 +473,10 @@ func backupSessionsFromView(_ view: AccountRecordsView<TelegramAccountManagerTyp
     for (peerId, record) in recordsToBackup {
         var backupName: String? = nil
         if let accountWithInfo = accountsWithInfo.first(where: { $0.peer.id == PeerId(peerId) }) {
-            if let user = accountWithInfo.peer as? TelegramUser {
-                if let username = user.username {
-                    backupName = "@\(username)"
-                } else {
-                    backupName = user.nameOrPhone
-                }
+            if let username = accountWithInfo.peer.addressName {
+                backupName = "@\(username)"
+            } else {
+                backupName = accountWithInfo.peer.debugDisplayTitle
             }
         }
         let backup = SessionBackup(name: backupName, accountRecord: record)

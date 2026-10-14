@@ -9,7 +9,6 @@ import SwiftSignalKit
 import AnimationCache
 import MultiAnimationRenderer
 import TelegramCore
-import Postbox
 import ChatListHeaderComponent
 import ActionPanelComponent
 import ChatFolderLinkPreviewScreen
@@ -72,7 +71,7 @@ final class ChatListContainerItemNode: ASDisplayNode {
         self.openArchiveSettings = openArchiveSettings
         self.isInlineMode = isInlineMode
         
-        self.listNode = ChatListNode(context: context, location: location, chatListFilter: filter, previewing: previewing, fillPreloadItems: controlsHistoryPreload, mode: chatListMode, theme: presentationData.theme, fontSize: presentationData.listsFontSize, strings: presentationData.strings, dateTimeFormat: presentationData.dateTimeFormat, nameSortOrder: presentationData.nameSortOrder, nameDisplayOrder: presentationData.nameDisplayOrder, animationCache: animationCache, animationRenderer: animationRenderer, disableAnimations: true, isInlineMode: isInlineMode, autoSetReady: autoSetReady, isMainTab: isMainTab)
+        self.listNode = ChatListNode(getNavigationController: { return controller?.navigationController as? NavigationController }, context: context, location: location, chatListFilter: filter, previewing: previewing, fillPreloadItems: controlsHistoryPreload, mode: chatListMode, theme: presentationData.theme, fontSize: presentationData.listsFontSize, strings: presentationData.strings, dateTimeFormat: presentationData.dateTimeFormat, nameSortOrder: presentationData.nameSortOrder, nameDisplayOrder: presentationData.nameDisplayOrder, animationCache: animationCache, animationRenderer: animationRenderer, disableAnimations: true, isInlineMode: isInlineMode, autoSetReady: autoSetReady, isMainTab: isMainTab)
         
         if let controller, case .chatList(groupId: .root) = controller.location {
             self.listNode.scrollHeightTopInset = ChatListNavigationBar.searchScrollHeight + ChatListNavigationBar.storiesScrollHeight
@@ -453,7 +452,7 @@ final class ChatListContainerItemNode: ASDisplayNode {
         let edgeEffectHeight: CGFloat = insets.bottom + 8.0
         let edgeEffectFrame = CGRect(origin: CGPoint(x: 0.0, y: size.height - edgeEffectHeight), size: CGSize(width: size.width, height: edgeEffectHeight))
         transition.updateFrame(view: self.edgeEffectView, frame: edgeEffectFrame)
-        self.edgeEffectView.update(content: self.presentationData.theme.list.plainBackgroundColor, rect: edgeEffectFrame, edge: .bottom, edgeSize: min(edgeEffectFrame.height, 40.0), transition: ComponentTransition(transition))
+        self.edgeEffectView.update(content: self.presentationData.theme.list.plainBackgroundColor, alpha: 0.6, rect: edgeEffectFrame, edge: .bottom, edgeSize: min(edgeEffectFrame.height, 40.0), transition: ComponentTransition(transition))
         transition.updateAlpha(layer: self.edgeEffectView.layer, alpha: edgeEffectHeight > 21.0 ? 1.0 : 0.0)
     }
     

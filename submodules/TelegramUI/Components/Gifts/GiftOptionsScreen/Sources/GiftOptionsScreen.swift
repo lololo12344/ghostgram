@@ -3,7 +3,6 @@ import UIKit
 import Display
 import AsyncDisplayKit
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
@@ -363,13 +362,13 @@ final class GiftOptionsScreenComponent: Component {
                         mainController.present(controller, in: .current)
                         return
                     }
-                    if gift.flags.contains(.requiresPremium) && !component.context.isPremium {
+                    if gift.flags.contains(.requiresPremium) && !component.context.isPremium && !((gift.availability?.resale ?? 0) > 0) {
                         let controller = component.context.sharedContext.makePremiumIntroController(context: component.context, source: .premiumGift(gift.file), forceDark: false, dismissed: nil)
                         mainController.push(controller)
                         return
                     }
                     
-                    if gift.flags.contains(.isAuction) && !((gift.availability?.resale ?? 0) > 0 && component.peerId != component.context.account.peerId) {
+                    if gift.flags.contains(.isAuction) && !((gift.availability?.resale ?? 0) > 0) {
                         guard let giftAuctionsManager = component.context.giftAuctionsManager else {
                             return
                         }
@@ -927,7 +926,7 @@ final class GiftOptionsScreenComponent: Component {
                                     if let controller = context.sharedContext.makePeerInfoController(
                                         context: context,
                                         updatedPresentationData: nil,
-                                        peer: peer._asPeer(),
+                                        peer: peer,
                                         mode: .gifts,
                                         avatarInitiallyExpanded: false,
                                         fromChat: false,
@@ -1369,7 +1368,6 @@ final class GiftOptionsScreenComponent: Component {
             
             let optionSpacing: CGFloat = 10.0
             let optionWidth = (availableSize.width - sideInset * 2.0 - optionSpacing * 2.0) / 3.0
-            
             let showStarPrice = (self.starsState?.balance.value ?? 0) > 10
             
             var hasGenericGifts = false
@@ -1382,7 +1380,7 @@ final class GiftOptionsScreenComponent: Component {
             }
             let hasAnyGifts = hasGenericGifts || hasTransferGifts
             
-            if isSelfGift || isChannelGift || isPremiumDisabled {
+            if isSelfGift || isChannelGift || isPremiumDisabled || { return true }() /* MARK: Swiftgram */  {
                 if !self.premiumItems.isEmpty {
                     for (_, itemView) in self.premiumItems {
                         itemView.view?.removeFromSuperview()

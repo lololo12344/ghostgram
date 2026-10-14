@@ -22,7 +22,6 @@ import DeviceLocationManager
 import ShareController
 import UrlEscaping
 import ContextUI
-import ComposePollUI
 import AlertUI
 import PresentationDataUtils
 import UndoUI
@@ -144,7 +143,10 @@ extension ChatControllerImpl {
                 return lhs.id < rhs.id
             }
             
-            let options = ChatInterfaceForwardOptionsState(hideNames: removeNames, hideCaptions: false, unhideNamesOnCaptionChange: false)
+            var attributes: [MessageAttribute] = []
+            if removeNames {
+                attributes.append(ForwardOptionsMessageAttribute(hideNames: true, hideCaptions: false))
+            }
             
             if !openCloud {
                 Queue.mainQueue().after(0.88) {
@@ -168,16 +170,9 @@ extension ChatControllerImpl {
                 }), in: .current)
             }
 
-            let mappedMessages: [EnqueueMessage]
-            switch strongSelf.buildForwardEnqueueMessages(from: sortedMessages, options: options, threadId: nil) {
-            case let .messages(messages):
-                mappedMessages = messages
-            case .unsupported:
-                strongSelf.presentUnsupportedProtectedForwardAlert(in: nil)
-                return
-            }
-            
-            let _ = (enqueueMessages(account: strongSelf.context.account, peerId: strongSelf.context.account.peerId, messages: mappedMessages)
+            let _ = (enqueueMessages(account: strongSelf.context.account, peerId: strongSelf.context.account.peerId, messages: sortedMessages.map { message -> EnqueueMessage in
+                return .forward(source: message.id, threadId: nil, grouping: .auto, attributes: attributes, correlationId: nil)
+            })
             |> deliverOnMainQueue).startStandalone(next: { messageIds in
                 guard openCloud else {
                     return

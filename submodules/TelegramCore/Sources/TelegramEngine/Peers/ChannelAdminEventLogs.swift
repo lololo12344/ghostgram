@@ -95,6 +95,7 @@ public enum AdminLogEventAction {
     case changeEmojiPack(prev: StickerPackReference?, new: StickerPackReference?)
     case participantSubscriptionExtended(prev: RenderedChannelParticipant, new: RenderedChannelParticipant)
     case toggleAutoTranslation(Bool)
+    case editRank(peerId: EnginePeer.Id, prev: String, new: String)
 }
 
 public enum ChannelAdminLogEventError {
@@ -129,12 +130,13 @@ public struct AdminLogEventsFlags: OptionSet {
     public static let invites = AdminLogEventsFlags(rawValue: 1 << 15)
     public static let sendMessages = AdminLogEventsFlags(rawValue: 1 << 16)
     public static let forums = AdminLogEventsFlags(rawValue: 1 << 17)
+    public static let ranks = AdminLogEventsFlags(rawValue: 1 << 19)
 
     public static var all: AdminLogEventsFlags {
-        return [.join, .leave, .invite, .ban, .unban, .kick, .unkick, .promote, .demote, .info, .settings, .sendMessages, .pinnedMessages, .editMessages, .deleteMessages, .calls, .invites, .forums]
+        return [.join, .leave, .invite, .ban, .unban, .kick, .unkick, .promote, .demote, .info, .settings, .sendMessages, .pinnedMessages, .editMessages, .deleteMessages, .calls, .invites, .forums, .ranks]
     }
     public static var flags: AdminLogEventsFlags {
-        return [.join, .leave, .invite, .ban, .unban, .kick, .unkick, .promote, .demote, .info, .settings, .sendMessages, .pinnedMessages, .editMessages, .deleteMessages, .calls, .invites, .forums]
+        return [.join, .leave, .invite, .ban, .unban, .kick, .unkick, .promote, .demote, .info, .settings, .sendMessages, .pinnedMessages, .editMessages, .deleteMessages, .calls, .invites, .forums, .ranks]
     }
 }
 
@@ -266,7 +268,7 @@ func channelAdminLogEvents(accountPeerId: PeerId, postbox: Postbox, network: Net
                                     let participant = ChannelParticipant(apiParticipant: channelAdminLogEventActionParticipantInviteData.participant)
                                     
                                     if let peer = peers[participant.peerId] {
-                                        action = .participantInvite(RenderedChannelParticipant(participant: participant, peer: peer))
+                                        action = .participantInvite(RenderedChannelParticipant(participant: participant, peer: EnginePeer(peer)))
                                     }
                                 case let .channelAdminLogEventActionParticipantToggleBan(channelAdminLogEventActionParticipantToggleBanData):
                                     let (prev, new) = (channelAdminLogEventActionParticipantToggleBanData.prevParticipant, channelAdminLogEventActionParticipantToggleBanData.newParticipant)
@@ -274,7 +276,7 @@ func channelAdminLogEvents(accountPeerId: PeerId, postbox: Postbox, network: Net
                                     let newParticipant = ChannelParticipant(apiParticipant: new)
                                     
                                     if let prevPeer = peers[prevParticipant.peerId], let newPeer = peers[newParticipant.peerId] {
-                                        action = .participantToggleBan(prev: RenderedChannelParticipant(participant: prevParticipant, peer: prevPeer), new: RenderedChannelParticipant(participant: newParticipant, peer: newPeer))
+                                        action = .participantToggleBan(prev: RenderedChannelParticipant(participant: prevParticipant, peer: EnginePeer(prevPeer)), new: RenderedChannelParticipant(participant: newParticipant, peer: EnginePeer(newPeer)))
                                     }
                                 case let .channelAdminLogEventActionParticipantToggleAdmin(channelAdminLogEventActionParticipantToggleAdminData):
                                     let (prev, new) = (channelAdminLogEventActionParticipantToggleAdminData.prevParticipant, channelAdminLogEventActionParticipantToggleAdminData.newParticipant)
@@ -282,7 +284,7 @@ func channelAdminLogEvents(accountPeerId: PeerId, postbox: Postbox, network: Net
                                     let newParticipant = ChannelParticipant(apiParticipant: new)
                                     
                                     if let prevPeer = peers[prevParticipant.peerId], let newPeer = peers[newParticipant.peerId] {
-                                        action = .participantToggleAdmin(prev: RenderedChannelParticipant(participant: prevParticipant, peer: prevPeer), new: RenderedChannelParticipant(participant: newParticipant, peer: newPeer))
+                                        action = .participantToggleAdmin(prev: RenderedChannelParticipant(participant: prevParticipant, peer: EnginePeer(prevPeer)), new: RenderedChannelParticipant(participant: newParticipant, peer: EnginePeer(newPeer)))
                                     }
                                 case let .channelAdminLogEventActionChangeStickerSet(channelAdminLogEventActionChangeStickerSetData):
                                     let (prevStickerset, newStickerset) = (channelAdminLogEventActionChangeStickerSetData.prevStickerset, channelAdminLogEventActionChangeStickerSetData.newStickerset)
@@ -478,11 +480,13 @@ func channelAdminLogEvents(accountPeerId: PeerId, postbox: Postbox, network: Net
                                     let newParticipant = ChannelParticipant(apiParticipant: new)
                                     
                                     if let prevPeer = peers[prevParticipant.peerId], let newPeer = peers[newParticipant.peerId] {
-                                        action = .participantSubscriptionExtended(prev: RenderedChannelParticipant(participant: prevParticipant, peer: prevPeer), new: RenderedChannelParticipant(participant: newParticipant, peer: newPeer))
+                                        action = .participantSubscriptionExtended(prev: RenderedChannelParticipant(participant: prevParticipant, peer: EnginePeer(prevPeer)), new: RenderedChannelParticipant(participant: newParticipant, peer: EnginePeer(newPeer)))
                                     }
                                 case let .channelAdminLogEventActionToggleAutotranslation(channelAdminLogEventActionToggleAutotranslationData):
                                     let newValue = channelAdminLogEventActionToggleAutotranslationData.newValue
                                     action = .toggleAutoTranslation(boolFromApiValue(newValue))
+                                case let .channelAdminLogEventActionParticipantEditRank(channelAdminLogEventActionParticipantEditRankData):
+                                    action = .editRank(peerId: EnginePeer.Id(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(channelAdminLogEventActionParticipantEditRankData.userId)), prev: channelAdminLogEventActionParticipantEditRankData.prevRank, new: channelAdminLogEventActionParticipantEditRankData.newRank)
                                 }
                                 let peerId = PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId))
                                 if let action = action {

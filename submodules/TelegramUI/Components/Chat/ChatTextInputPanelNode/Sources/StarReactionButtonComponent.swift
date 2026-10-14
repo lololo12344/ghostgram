@@ -7,14 +7,6 @@ import GlassBackgroundComponent
 import AnimatedTextComponent
 import StarsParticleEffect
 
-private func neutralStarReactionGlassTint(theme: PresentationTheme) -> GlassBackgroundView.TintColor {
-    if theme.overallDarkAppearance {
-        return .init(kind: .custom, color: UIColor(white: 0.0, alpha: 0.38))
-    } else {
-        return .init(kind: .custom, color: UIColor(white: 1.0, alpha: 0.68))
-    }
-}
-
 final class StarReactionButtonBadgeComponent: Component {
     let theme: PresentationTheme
     let count: Int
@@ -86,9 +78,9 @@ final class StarReactionButtonBadgeComponent: Component {
             
             let backgroundTintColor: GlassBackgroundView.TintColor
             if component.isFilled {
-                backgroundTintColor = .init(kind: .custom, color: UIColor(rgb: 0xFFB10D))
+                backgroundTintColor = .init(kind: .custom(style: .default, color: UIColor(rgb: 0xFFB10D)))
             } else {
-                backgroundTintColor = neutralStarReactionGlassTint(theme: component.theme)
+                backgroundTintColor = .init(kind: .panel)
             }
             
             self.backgroundView.update(size: backgroundFrame.size, cornerRadius: backgroundFrame.height * 0.5, isDark: component.theme.overallDarkAppearance, tintColor: backgroundTintColor, isInteractive: true, transition: transition)
@@ -344,9 +336,9 @@ final class StarReactionButtonComponent: Component {
             
             let backgroundTintColor: GlassBackgroundView.TintColor
             if component.isFilled {
-                backgroundTintColor = .init(kind: .custom, color: UIColor(rgb: 0xFFB10D))
+                backgroundTintColor = .init(kind: .custom(style: .default, color: UIColor(rgb: 0xFFB10D)))
             } else {
-                backgroundTintColor = neutralStarReactionGlassTint(theme: component.theme)
+                backgroundTintColor = .init(kind: .panel)
             }
             
             self.backgroundView.update(size: backgroundFrame.size, cornerRadius: backgroundFrame.height * 0.5, isDark: component.theme.overallDarkAppearance, tintColor: backgroundTintColor, isInteractive: false, transition: transition)

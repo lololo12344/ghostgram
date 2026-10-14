@@ -308,7 +308,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
         guard let item = self.item else{
             return
         }
-        let _ = item.controllerInteraction.requestMessageUpdate(item.message.id, false)
+        let _ = item.controllerInteraction.requestMessageUpdate(item.message.id, false, nil)
     }
     
     private func makeProgress() -> Promise<Bool> {
@@ -378,17 +378,6 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
     }
         
     override public func asyncLayoutContent() -> (_ item: ChatMessageBubbleContentItem, _ layoutConstants: ChatMessageItemLayoutConstants, _ preparePosition: ChatMessageBubblePreparePosition, _ messageSelection: Bool?, _ constrainedSize: CGSize, _ avatarInset: CGFloat) -> (ChatMessageBubbleContentProperties, unboundSize: CGSize?, maxWidth: CGFloat, layout: (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))) {
-        return { item, _, _, _, _, _ in
-            let contentProperties = ChatMessageBubbleContentProperties(hidesSimpleAuthorHeader: true, headerSpacing: 0.0, hidesBackground: .always, forceFullCorners: false, forceAlignment: .center)
-            return (contentProperties, nil, 220.0, { _, _ in
-                return (220.0, { _ in
-                    return (CGSize(width: 220.0, height: 120.0), { [weak self] _, _, _ in
-                        self?.item = item
-                    })
-                })
-            })
-        }
-#if false
         let makeLabelLayout = TextNode.asyncLayout(self.labelNode)
         let makeTitleLayout = TextNode.asyncLayout(self.titleNode)
         let makeSubtitleLayout = TextNodeWithEntities.asyncLayout(self.subtitleNode)
@@ -413,10 +402,10 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
         
         let cachedTonImage = self.cachedTonImage
         
-        let asyncLayout: (ChatMessageBubbleContentItem, ChatMessageItemLayoutConstants, ChatMessageBubblePreparePosition, Bool?, CGSize, CGFloat) -> (ChatMessageBubbleContentProperties, CGSize?, CGFloat, (CGSize, ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void))) = { (item: ChatMessageBubbleContentItem, layoutConstants: ChatMessageItemLayoutConstants, preparePosition: ChatMessageBubblePreparePosition, messageSelection: Bool?, constrainedSize: CGSize, avatarInset: CGFloat) in
+        return { item, layoutConstants, _, _, _, _ in
             let contentProperties = ChatMessageBubbleContentProperties(hidesSimpleAuthorHeader: true, headerSpacing: 0.0, hidesBackground: .always, forceFullCorners: false, forceAlignment: .center)
                         
-            return (contentProperties, nil, CGFloat.greatestFiniteMagnitude, { (constrainedSize: CGSize, position: ChatMessageBubbleContentPosition) -> (CGFloat, (CGFloat) -> (CGSize, (ListViewItemUpdateAnimation, Bool, ListViewItemApply?) -> Void)) in
+            return (contentProperties, nil, CGFloat.greatestFiniteMagnitude, { constrainedSize, position in
                 var giftSize = CGSize(width: 220.0, height: 240.0)
                 
                 let incoming: Bool
@@ -592,7 +581,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                 
                                 let isChannelGift = item.message.id.peerId.namespace == Namespaces.Peer.CloudChannel || channelPeerId != nil
                                 if isSelfGift {
-                                    title = item.presentationData.strings.Notification_StarGift_Self_Title
+                                    title = item.presentationData.strings.Notification_StarGift_Purchased_Title
                                 } else {
                                     if isPrepaidUpgrade && senderPeerId == channelPeerId {
                                         title = item.presentationData.strings.Gift_View_Unknown_Title
@@ -701,7 +690,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                     }
                                 }
                             }
-                        case let .starGiftUnique(gift, isUpgrade, _, _, _, _, isRefunded, _, _, _, _, _, _, _, _, _, fromOffer):
+                        case let .starGiftUnique(gift, isUpgrade, _, _, _, _, isRefunded, _, _, _, _, _, _, _, _, _, fromOffer, _, isCrafted):
                             if case let .unique(uniqueGift) = gift {
                                 isStarGift = true
                                 
@@ -723,7 +712,13 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                 if isStoryEntity {
                                     title = uniqueGift.title
                                 } else if isSelfGift {
-                                    title = item.presentationData.strings.Notification_StarGift_Self_Title
+                                    if isCrafted {
+                                        title = item.presentationData.strings.Notification_StarGift_Crafted_Title
+                                    } else if isUpgrade {
+                                        title = item.presentationData.strings.Notification_StarGift_Upgraded_Title
+                                    } else {
+                                        title = item.presentationData.strings.Notification_StarGift_Purchased_Title
+                                    }
                                 } else if item.message.id.peerId.isTelegramNotifications {
                                     title = item.presentationData.strings.Notification_StarGift_TitleShort
                                 } else {
@@ -736,14 +731,21 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                 } else {
                                     ribbonTitle = isStoryEntity ? "" : item.presentationData.strings.Notification_StarGift_Gift
                                 }
+                                                                
                                 buttonTitle = isStoryEntity ? "" : item.presentationData.strings.Notification_StarGift_View
                                 modelTitle = item.presentationData.strings.Notification_StarGift_Model
                                 backdropTitle = item.presentationData.strings.Notification_StarGift_Backdrop
                                 symbolTitle = item.presentationData.strings.Notification_StarGift_Symbol
                                 
+                                if uniqueGift.flags.contains(.isBurned) {
+                                    ribbonTitle = item.presentationData.strings.Notification_StarGift_Burned
+                                    customRibbonColors = [UIColor(rgb: 0xd9433a), UIColor(rgb: 0xff645b)]
+                                    buttonTitle = ""
+                                }
+                                
                                 for attribute in uniqueGift.attributes {
                                     switch attribute {
-                                    case let .model(name, file, _):
+                                    case let .model(name, file, _, _):
                                         modelValue = name
                                         animationFile = file
                                     case let .backdrop(name, _, innerColor, outerColor, patternColor, _, _):
@@ -1482,8 +1484,6 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                 })
             })
         }
-        return asyncLayout
-#endif
     }
 
     override public func updateAbsoluteRect(_ rect: CGRect, within containerSize: CGSize) {

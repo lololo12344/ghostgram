@@ -42,6 +42,42 @@
 #import <LegacyComponents/TGTooltipView.h>
 
 #import <LegacyComponents/TGPhotoCaptionInputMixin.h>
+#import <LegacyComponents/TGPhotoPaintStickersContext.h>
+
+static UIView<TGPhotoToolbarViewProtocol> *TGMediaPickerCreatePhotoToolbarView(id<LegacyComponentsContext> context, TGPhotoEditorBackButton backButton, TGPhotoEditorDoneButton doneButton, bool solidBackground, id<TGPhotoPaintStickersContext> stickersContext, bool hasSendStarsButton)
+{
+    if (stickersContext.photoToolbarView != nil)
+    {
+        UIView<TGPhotoToolbarViewProtocol> *toolbarView = stickersContext.photoToolbarView(backButton, doneButton, solidBackground, hasSendStarsButton);
+        if (toolbarView != nil)
+            return toolbarView;
+    }
+
+    return [[TGPhotoToolbarView alloc] initWithContext:context backButton:backButton doneButton:doneButton solidBackground:solidBackground stickersContext:hasSendStarsButton ? stickersContext : nil];
+}
+
+static TGMediaAsset *TGMediaPickerGalleryLivePhotoAsset(id<TGMediaEditableItem> editableMediaItem)
+{
+    if ([editableMediaItem isKindOfClass:[TGCameraCapturedVideo class]])
+        return ((TGCameraCapturedVideo *)editableMediaItem).originalAsset;
+
+    if ([editableMediaItem isKindOfClass:[TGMediaAsset class]])
+        return (TGMediaAsset *)editableMediaItem;
+
+    return nil;
+}
+
+static TGMediaLivePhotoMode TGMediaPickerGalleryResolvedLivePhotoMode(NSNumber *livePhotoMode, bool forceLivePhotoEnabled, id<TGMediaEditableItem> editableMediaItem)
+{
+    if (livePhotoMode != nil)
+        return (TGMediaLivePhotoMode)[livePhotoMode unsignedIntegerValue];
+
+    TGMediaAsset *asset = TGMediaPickerGalleryLivePhotoAsset(editableMediaItem);
+    if ((asset.subtypes & TGMediaAssetSubtypePhotoLive) == 0)
+        return TGMediaLivePhotoModeOff;
+
+    return forceLivePhotoEnabled ? TGMediaLivePhotoModeLive : TGMediaLivePhotoModeOff;
+}
 
 @interface TGMediaPickerGalleryWrapperView: UIView
 {
@@ -78,8 +114,8 @@
     
     UIView *_wrapperView;
     UIView *_headerWrapperView;
-    TGPhotoToolbarView *_portraitToolbarView;
-    TGPhotoToolbarView *_landscapeToolbarView;
+    UIView<TGPhotoToolbarViewProtocol> *_portraitToolbarView;
+    UIView<TGPhotoToolbarViewProtocol> *_landscapeToolbarView;
     
     UIImageView *_arrowView;
     UILabel *_recipientLabel;
@@ -87,6 +123,7 @@
     TGPhotoCaptionInputMixin *_captionMixin;
     
     TGModernButton *_muteButton;
+    TGModernButton *_telescopeButton;
     TGCheckButtonView *_checkButton;
     bool _ignoreSetSelected;
     TGMediaPickerPhotoCounterButton *_photoCounterButton;
@@ -123,6 +160,8 @@
     id<LegacyComponentsContext> _context;
     
     bool _ignoreSelectionUpdates;
+    bool _canSendTelescope;
+    bool _canShowTelescope;
 }
 
 @property (nonatomic, strong) ASHandle *actionHandle;
@@ -134,7 +173,7 @@
 
 @synthesize safeAreaInset = _safeAreaInset;
 
-- (instancetype)initWithContext:(id<LegacyComponentsContext>)context focusItem:(id<TGModernGalleryItem>)focusItem selectionContext:(TGMediaSelectionContext *)selectionContext editingContext:(TGMediaEditingContext *)editingContext stickersContext:(id<TGPhotoPaintStickersContext>)stickersContext hasSelectionPanel:(bool)hasSelectionPanel hasCameraButton:(bool)hasCameraButton recipientName:(NSString *)recipientName isScheduledMessages:(bool)isScheduledMessages hasCoverButton:(bool)hasCoverButton
+- (instancetype)initWithContext:(id<LegacyComponentsContext>)context focusItem:(id<TGModernGalleryItem>)focusItem selectionContext:(TGMediaSelectionContext *)selectionContext editingContext:(TGMediaEditingContext *)editingContext stickersContext:(id<TGPhotoPaintStickersContext>)stickersContext hasSelectionPanel:(bool)hasSelectionPanel hasCameraButton:(bool)hasCameraButton recipientName:(NSString *)recipientName isScheduledMessages:(bool)isScheduledMessages canShowTelescope:(bool)canShowTelescope canSendTelescope:(bool)canSendTelescope hasCoverButton:(bool)hasCoverButton
 {
     self = [super initWithFrame:CGRectZero];
     if (self != nil)
@@ -201,11 +240,16 @@
                 return;
             
             [strongSelf.window endEditing:true];
-            if (strongSelf->_doneLongPressed != nil)
-                strongSelf->_doneLongPressed(strongSelf->_currentItem);
+            if (strongSelf->_doneLongPressed != nil) {
+                UIView *sourceView = [sender isKindOfClass:[UIView class]] ? (UIView *)sender : nil;
+                strongSelf->_doneLongPressed(strongSelf->_currentItem, sourceView);
+            }
             
             [[NSUserDefaults standardUserDefaults] setObject:@(3) forKey:@"TG_displayedMediaTimerTooltip_v3"];
         };
+        
+        _canSendTelescope = canSendTelescope;
+        _canShowTelescope = canShowTelescope;
         
         _muteButton = [[TGModernButton alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
         _muteButton.hidden = true;
@@ -215,7 +259,22 @@
         [_muteButton setImage:[TGPhotoEditorInterfaceAssets muteActiveIcon] forState:UIControlStateSelected];
         [_muteButton setImage:[TGPhotoEditorInterfaceAssets muteActiveIcon]  forState:UIControlStateSelected | UIControlStateHighlighted];
         [_muteButton addTarget:self action:@selector(toggleSendAsGif) forControlEvents:UIControlEventTouchUpInside];
-        [_wrapperView addSubview:_muteButton];
+        [_wrapperView addSubview:_muteButton];  
+    
+        _telescopeButton = [[TGModernButton alloc] initWithFrame:CGRectMake(0, 0, 40.0f, 40.0f)];
+        _telescopeButton.hidden = true;
+        _telescopeButton.adjustsImageWhenHighlighted = false;
+        [_telescopeButton setBackgroundImage:[TGPhotoEditorInterfaceAssets gifBackgroundImage] forState:UIControlStateNormal];
+        [_telescopeButton setImage:[TGPhotoEditorInterfaceAssets telescopeIcon] forState:UIControlStateNormal];
+        if (_canSendTelescope) {
+            [_telescopeButton setImage:[TGPhotoEditorInterfaceAssets telescopeActiveIcon] forState:UIControlStateSelected];
+            [_telescopeButton setImage:[TGPhotoEditorInterfaceAssets telescopeActiveIcon]  forState:UIControlStateSelected | UIControlStateHighlighted];
+            [_telescopeButton setImage:[TGPhotoEditorInterfaceAssets telescopeActiveIcon] forState:UIControlStateSelected];
+        } else {
+            _telescopeButton.fadeDisabled = true;
+        }
+        [_telescopeButton addTarget:self action:@selector(toggleSendAsTelescope) forControlEvents:UIControlEventTouchUpInside];
+        [_wrapperView addSubview:_telescopeButton];
         
         if (recipientName.length > 0)
         {
@@ -281,7 +340,7 @@
                 if (_editingContext != nil)
                 {
                     _timersChangedDisposable = [_editingContext.timersUpdatedSignal startStrictWithNext:^(__unused NSNumber *next)
-                                                {
+                    {
                         __strong TGMediaPickerGalleryInterfaceView *strongSelf = weakSelf;
                         if (strongSelf == nil)
                             return;
@@ -290,7 +349,7 @@
                     } file:__FILE_NAME__ line:__LINE__];
                     
                     _adjustmentsChangedDisposable = [_editingContext.adjustmentsUpdatedSignal startStrictWithNext:^(__unused NSNumber *next)
-                                                     {
+                    {
                         __strong TGMediaPickerGalleryInterfaceView *strongSelf = weakSelf;
                         if (strongSelf == nil)
                             return;
@@ -340,6 +399,11 @@
             {
                 TGMediaPickerGalleryVideoItemView *videoItemView = (TGMediaPickerGalleryVideoItemView *)strongSelf->_currentItemView;
                 [videoItemView returnFromEditing];
+            }
+            else if ([currentItemView isKindOfClass:[TGMediaPickerGalleryPhotoItemView class]])
+            {
+                TGMediaPickerGalleryPhotoItemView *photoItemView = (TGMediaPickerGalleryPhotoItemView *)strongSelf->_currentItemView;
+                [photoItemView returnFromEditing];
             }
             
             [strongSelf setSelectionInterfaceHidden:false delay:0.25 animated:true];
@@ -396,8 +460,21 @@
             [strongSelf->_editingContext setCaptionAbove:captionIsAbove];
         };
         
+        _captionMixin.livePhotoModeUpdated = ^(NSUInteger mode) {
+            __strong TGMediaPickerGalleryInterfaceView *strongSelf = weakSelf;
+            if (strongSelf == nil)
+                return;
+            
+            if (![strongSelf->_currentItem conformsToProtocol:@protocol(TGModernGalleryEditableItem)])
+                return;
+            
+            id<TGModernGalleryEditableItem> galleryEditableItem = (id<TGModernGalleryEditableItem>)strongSelf->_currentItem;
+            [strongSelf->_editingContext setLivePhotoMode:(TGMediaLivePhotoMode)mode forItem:galleryEditableItem.editableMediaItem];
+            
+            [strongSelf->_selectionContext setItem:(id<TGMediaSelectableItem>)galleryEditableItem.editableMediaItem selected:true animated:true sender:nil];
+        };
+        
         _captionMixin.stickersContext = stickersContext;
-        [_captionMixin createInputPanelIfNeeded];
         
         _headerWrapperView = [[TGMediaPickerGalleryWrapperView alloc] init];
         [_wrapperView addSubview:_headerWrapperView];
@@ -430,19 +507,21 @@
         
         TGPhotoEditorDoneButton doneButton = isScheduledMessages ? TGPhotoEditorDoneButtonSchedule : TGPhotoEditorDoneButtonSend;
         
-        _portraitToolbarView = [[TGPhotoToolbarView alloc] initWithContext:_context backButton:TGPhotoEditorBackButtonBack doneButton:doneButton solidBackground:false stickersContext:editingContext.sendPaidMessageStars > 0 ? stickersContext : nil];
+        _portraitToolbarView = TGMediaPickerCreatePhotoToolbarView(_context, TGPhotoEditorBackButtonBack, doneButton, false, stickersContext, editingContext.sendPaidMessageStars > 0);
         _portraitToolbarView.cancelPressed = toolbarCancelPressed;
         _portraitToolbarView.donePressed = toolbarDonePressed;
         _portraitToolbarView.doneLongPressed = toolbarDoneLongPressed;
         [_wrapperView addSubview:_portraitToolbarView];
         
-        _landscapeToolbarView = [[TGPhotoToolbarView alloc] initWithContext:_context backButton:TGPhotoEditorBackButtonBack doneButton:doneButton solidBackground:false stickersContext:nil];
+        _landscapeToolbarView = TGMediaPickerCreatePhotoToolbarView(_context, TGPhotoEditorBackButtonBack, doneButton, false, stickersContext, false);
         _landscapeToolbarView.cancelPressed = toolbarCancelPressed;
         _landscapeToolbarView.donePressed = toolbarDonePressed;
         _landscapeToolbarView.doneLongPressed = toolbarDoneLongPressed;
         
         if ([UIDevice currentDevice].userInterfaceIdiom != UIUserInterfaceIdiomPad)
             [_wrapperView addSubview:_landscapeToolbarView];
+        
+        [_captionMixin createInputPanelIfNeeded];
         
         if (hasCoverButton) {
             _cancelCoverButton = [[TGModernButton alloc] init];
@@ -512,7 +591,8 @@
                 }
                 
                 id<TGMediaEditAdjustments> adjustments = [_editingContext adjustmentsForItem:item];
-                if ([adjustments isKindOfClass:[TGMediaVideoEditAdjustments class]] && ((TGMediaVideoEditAdjustments *)adjustments).sendAsGif)
+                if ([adjustments isKindOfClass:[TGMediaVideoEditAdjustments class]] && (((TGMediaVideoEditAdjustments *)adjustments).sendAsGif || ((TGMediaVideoEditAdjustments *)adjustments).sendAsTelescope))
+
                 {
                     onlyGroupableMedia = false;
                     break;
@@ -533,6 +613,14 @@
 - (void)updateCameraButtonVisibility
 {
     
+}
+
+- (bool)canBeginEditingCaption {
+    return _hasCaptions && _captionMixin != nil && _captionMixin.inputPanel != nil && !_captionMixin.inputPanelView.hidden && !_captionMixin.editing;
+}
+
+- (void)beginEditingCaption {
+    [_captionMixin activateInput];
 }
 
 - (void)setHasCaptions:(bool)hasCaptions
@@ -594,17 +682,17 @@
 - (UIView *)timerButton
 {
     if (UIInterfaceOrientationIsPortrait(self.interfaceOrientation))
-        return [_portraitToolbarView buttonForTab:TGPhotoEditorTimerTab];
+        return [_portraitToolbarView viewForTab:TGPhotoEditorTimerTab];
     else
-        return [_landscapeToolbarView buttonForTab:TGPhotoEditorTimerTab];
+        return [_landscapeToolbarView viewForTab:TGPhotoEditorTimerTab];
 }
 
 - (UIView *)qualityButton
 {
     if (UIInterfaceOrientationIsPortrait(self.interfaceOrientation))
-        return [_portraitToolbarView buttonForTab:TGPhotoEditorQualityTab];
+        return [_portraitToolbarView viewForTab:TGPhotoEditorQualityTab];
     else
-        return [_landscapeToolbarView buttonForTab:TGPhotoEditorQualityTab];
+        return [_landscapeToolbarView viewForTab:TGPhotoEditorQualityTab];
 }
 
 - (void)setSelectedItemsModel:(TGMediaPickerGallerySelectedItemsModel *)selectedItemsModel
@@ -692,9 +780,18 @@
                 if ([item.asset isKindOfClass:[TGCameraCapturedVideo class]] && ((TGCameraCapturedVideo *)item.asset).isAnimation) {
                     sendableAsGif = false;
                 }
+            } else if ([strongSelf->_currentItem isKindOfClass:[TGMediaPickerGalleryFetchResultItem class]]) {
+                TGMediaPickerGalleryFetchResultItem *item = (TGMediaPickerGalleryFetchResultItem *)strongSelf->_currentItem;
+                if ([item.asset isKindOfClass:[TGMediaAsset class]] && ((TGMediaAsset *)item.asset).type == TGMediaAssetPhotoType) {
+                    sendableAsGif = false;
+                }
             }
             strongSelf->_muteButton.hidden = !sendableAsGif;
             
+            if (strongSelf->_canShowTelescope) {
+                strongSelf->_telescopeButton.hidden = !sendableAsGif;
+            }
+
             bool canHaveCover = false;
             if ([strongItemView isKindOfClass:[TGMediaPickerGalleryVideoItemView class]]) {
                 TGMediaPickerGalleryVideoItemView *itemView = (TGMediaPickerGalleryVideoItemView *)strongItemView;
@@ -706,6 +803,7 @@
         }
     } file:__FILE_NAME__ line:__LINE__]];
     
+    bool hasLivePhotoButton = false;
     UIImage *muteIcon = [TGPhotoEditorInterfaceAssets muteIcon];
     UIImage *muteActiveIcon = [TGPhotoEditorInterfaceAssets muteActiveIcon];
     if ([item isKindOfClass:[TGMediaPickerGalleryVideoItem class]]) {
@@ -717,10 +815,28 @@
                 muteActiveIcon = [TGPhotoEditorInterfaceAssets gifActiveIcon];
             }
         }
+    } else if ([item isKindOfClass:[TGMediaPickerGalleryFetchResultItem class]]) {
+        TGMediaPickerGalleryFetchResultItem *photoGalleryItem = (TGMediaPickerGalleryFetchResultItem *)item;
+        if ([photoGalleryItem.asset isKindOfClass:[TGMediaAsset class]]) {
+            TGMediaAsset *asset = (TGMediaAsset *)photoGalleryItem.asset;
+            if (asset.subtypes & TGMediaAssetSubtypePhotoLive) {
+                hasLivePhotoButton = true;
+            }
+        }
+    } else if ([item isKindOfClass:[TGMediaPickerGalleryPhotoItem class]]) {
+        TGMediaPickerGalleryPhotoItem *photoGalleryItem = (TGMediaPickerGalleryPhotoItem *)item;
+        if ([photoGalleryItem.asset isKindOfClass:[TGMediaAsset class]]) {
+            TGMediaAsset *asset = (TGMediaAsset *)photoGalleryItem.asset;
+            if (asset.subtypes & TGMediaAssetSubtypePhotoLive) {
+                hasLivePhotoButton = true;
+            }
+        }
     }
     [_muteButton setImage:muteIcon forState:UIControlStateNormal];
     [_muteButton setImage:muteActiveIcon forState:UIControlStateSelected];
     [_muteButton setImage:muteActiveIcon forState:UIControlStateSelected | UIControlStateHighlighted];
+    
+    [_captionMixin setLivePhotoHidden:!hasLivePhotoButton];
     
     [self setNeedsLayout];
 }
@@ -1040,13 +1156,18 @@
         [_adjustmentsDisposable setDisposable:[[[[galleryEditableItem.editingContext adjustmentsSignalForItem:editableMediaItem] mapToSignal:^SSignal *(id<TGMediaEditAdjustments> adjustments) {
             __strong id<TGModernGalleryEditableItem> strongGalleryEditableItem = weakGalleryEditableItem;
             if (strongGalleryEditableItem != nil) {
-                return [[strongGalleryEditableItem.editingContext timerSignalForItem:editableMediaItem] map:^id(id timer) {
-                    NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
-                    if (adjustments != nil)
-                        dict[@"adjustments"] = adjustments;
-                    if (timer != nil)
-                        dict[@"timer"] = timer;
-                    return dict;
+                return [[strongGalleryEditableItem.editingContext timerSignalForItem:editableMediaItem] mapToSignal:^id(id timer) {
+                    return [[strongGalleryEditableItem.editingContext forceLivePhotoEnabled] mapToSignal:^SSignal *(NSNumber *forceLivePhotoEnabled) {
+                        return [[strongGalleryEditableItem.editingContext livePhotoModeSignalForItem:editableMediaItem] map:^id(id livePhotoMode) {
+                            NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+                            if (adjustments != nil)
+                                dict[@"adjustments"] = adjustments;
+                            if (timer != nil)
+                                dict[@"timer"] = timer;
+                            dict[@"livePhotoMode"] = @(TGMediaPickerGalleryResolvedLivePhotoMode(livePhotoMode, [forceLivePhotoEnabled boolValue], editableMediaItem));
+                            return dict;
+                        }];
+                    }];
                 }];
             } else {
                 return [SSignal never];
@@ -1059,6 +1180,12 @@
             
             id<TGMediaEditAdjustments> adjustments = dict[@"adjustments"];
             NSNumber *timer = dict[@"timer"];
+            TGMediaLivePhotoMode livePhotoMode = (TGMediaLivePhotoMode)[dict[@"livePhotoMode"] unsignedIntValue];
+            
+            [strongSelf->_captionMixin setLivePhotoMode:livePhotoMode];
+            if ([strongSelf->_currentItemView isKindOfClass:[TGMediaPickerGalleryPhotoItemView class]]) {
+                [((TGMediaPickerGalleryPhotoItemView *)strongSelf->_currentItemView) setLivePhotoMode:livePhotoMode];
+            }
             
             [strongSelf->_captionMixin setTimeout:[timer intValue] isVideo:editableMediaItem.isVideo isCaptionAbove:isCaptionAbove];
             
@@ -1105,20 +1232,17 @@
     TGPhotoEditorTab disabledButtons = TGPhotoEditorNoneTab;
     
     _muteButton.selected = adjustments.sendAsGif;
+    _telescopeButton.selected = adjustments.sendAsTelescope;
     
-    TGPhotoEditorButton *qualityButton = [_portraitToolbarView buttonForTab:TGPhotoEditorQualityTab];
+    UIView *qualityButton = [_portraitToolbarView viewForTab:TGPhotoEditorQualityTab];
     if (qualityButton != nil)
     {
         bool isPhoto = [_currentItemView isKindOfClass:[TGMediaPickerGalleryPhotoItemView class]] || [_currentItem isKindOfClass:[TGCameraCapturedPhoto class]];
+        bool isHd = false;
+        TGMediaVideoConversionPreset preset = TGMediaVideoConversionPresetCompressedMedium;
         if (isPhoto) {
-            bool isHd = _editingContext.isHighQualityPhoto;
-            UIImage *icon = [TGPhotoEditorInterfaceAssets qualityIconForHighQuality:isHd filled: false];
-            qualityButton.iconImage = icon;
-            
-            qualityButton = [_landscapeToolbarView buttonForTab:TGPhotoEditorQualityTab];
-            qualityButton.iconImage = icon;
+            isHd = _editingContext.isHighQualityPhoto;
         } else {
-            TGMediaVideoConversionPreset preset = 0;
             TGMediaVideoConversionPreset adjustmentsPreset = TGMediaVideoConversionPresetCompressedDefault;
             if ([adjustments isKindOfClass:[TGMediaVideoEditAdjustments class]])
                 adjustmentsPreset = ((TGMediaVideoEditAdjustments *)adjustments).preset;
@@ -1139,28 +1263,19 @@
             TGMediaVideoConversionPreset bestPreset = [TGMediaVideoConverter bestAvailablePresetForDimensions:dimensions];
             if (preset > bestPreset)
                 preset = bestPreset;
-            
-            UIImage *icon = [TGPhotoEditorInterfaceAssets qualityIconForPreset:preset];
-            qualityButton.iconImage = icon;
-            
-            qualityButton = [_landscapeToolbarView buttonForTab:TGPhotoEditorQualityTab];
-            qualityButton.iconImage = icon;
         }
+
+        [_portraitToolbarView setQualityButtonIsPhoto:isPhoto highQuality:isHd videoPreset:preset];
+        [_landscapeToolbarView setQualityButtonIsPhoto:isPhoto highQuality:isHd videoPreset:preset];
     }
     
-    TGPhotoEditorButton *timerButton = [_portraitToolbarView buttonForTab:TGPhotoEditorTimerTab];
+    UIView *timerButton = [_portraitToolbarView viewForTab:TGPhotoEditorTimerTab];
     if (timerButton != nil)
     {
         NSInteger value = [timer integerValue];
         
-        UIImage *defaultIcon = [TGPhotoEditorInterfaceAssets timerIconForValue:0];
-        UIImage *icon = [TGPhotoEditorInterfaceAssets timerIconForValue:value];
-        [timerButton setIconImage:defaultIcon activeIconImage:icon];
-        
-        TGPhotoEditorButton *landscapeTimerButton = [_landscapeToolbarView buttonForTab:TGPhotoEditorTimerTab];
-                
-        timerButton = landscapeTimerButton;
-        [timerButton setIconImage:defaultIcon activeIconImage:icon];
+        [_portraitToolbarView setTimerButtonValue:value];
+        [_landscapeToolbarView setTimerButtonValue:value];
         
         if (value > 0)
             highlightedButtons |= TGPhotoEditorTimerTab;
@@ -1177,7 +1292,7 @@
         });
     }
     
-    if (adjustments.sendAsGif)
+    if (adjustments.sendAsGif || adjustments.sendAsTelescope)
         disabledButtons |= TGPhotoEditorQualityTab;
     
     [_portraitToolbarView setEditButtonsHighlighted:highlightedButtons];
@@ -1328,16 +1443,20 @@
         {
             _checkButton.alpha = alpha;
             _muteButton.alpha = alpha;
+            _telescopeButton.alpha = alpha;
             _coverButton.alpha = alpha;
             _arrowView.alpha = alpha * 0.6f;
             _recipientLabel.alpha = alpha * 0.6;
+            _captionMixin.livePhotoButtonView.alpha = alpha;
         } completion:^(BOOL finished)
         {
             if (finished)
             {
                 _checkButton.userInteractionEnabled = !hidden;
                 _muteButton.userInteractionEnabled = !hidden;
+                _telescopeButton.userInteractionEnabled = !hidden;
                 _coverButton.userInteractionEnabled = !hidden;
+                _captionMixin.livePhotoButtonView.userInteractionEnabled = !hidden;
             }
         }];
         
@@ -1359,13 +1478,19 @@
         _checkButton.userInteractionEnabled = !hidden;
         
         _muteButton.alpha = alpha;
-        _muteButton.userInteractionEnabled = !hidden;
+        _muteButton.userInteractionEnabled = !hidden; 
+        
+        _telescopeButton.alpha = alpha;
+        _telescopeButton.userInteractionEnabled = !hidden;
         
         _coverButton.alpha = alpha;
         _coverButton.userInteractionEnabled = !hidden;
         
         _arrowView.alpha = alpha * 0.6f;
         _recipientLabel.alpha = alpha * 0.6;
+        
+        _captionMixin.livePhotoButtonView.alpha = alpha;
+        _captionMixin.livePhotoButtonView.userInteractionEnabled = !hidden;
     }
     
     if (hidden)
@@ -1393,24 +1518,26 @@
         {
             _checkButton.alpha = alpha;
             _muteButton.alpha = alpha;
+            _telescopeButton.alpha = alpha;
             _coverButton.alpha = alpha;
             _arrowView.alpha = alpha * 0.6;
             _recipientLabel.alpha = alpha * 0.6;
             _portraitToolbarView.alpha = alpha;
             _landscapeToolbarView.alpha = alpha;
             _captionMixin.inputPanelView.alpha = alpha;
-            _captionMixin.backgroundView.alpha = alpha;
+            _captionMixin.livePhotoButtonView.alpha = alpha;
         } completion:^(BOOL finished)
         {
             if (finished)
             {
                 _checkButton.userInteractionEnabled = !hidden;
                 _muteButton.userInteractionEnabled = !hidden;
+                _telescopeButton.userInteractionEnabled = !hidden;
                 _coverButton.userInteractionEnabled = !hidden;
                 _portraitToolbarView.userInteractionEnabled = !hidden;
                 _landscapeToolbarView.userInteractionEnabled = !hidden;
                 _captionMixin.inputPanelView.userInteractionEnabled = !hidden;
-                _captionMixin.backgroundView.userInteractionEnabled = !hidden;
+                _captionMixin.livePhotoButtonView.userInteractionEnabled = !hidden;
             }
         }];
         
@@ -1432,7 +1559,10 @@
         _checkButton.userInteractionEnabled = !hidden;
         
         _muteButton.alpha = alpha;
-        _muteButton.userInteractionEnabled = !hidden;
+        _muteButton.userInteractionEnabled = !hidden;       
+
+        _telescopeButton.alpha = alpha;
+        _telescopeButton.userInteractionEnabled = !hidden;
         
         _coverButton.alpha = alpha;
         _coverButton.userInteractionEnabled = !hidden;
@@ -1449,8 +1579,8 @@
         _captionMixin.inputPanelView.alpha = alpha;
         _captionMixin.inputPanelView.userInteractionEnabled = !hidden;
         
-        _captionMixin.backgroundView.alpha = alpha;
-        _captionMixin.backgroundView.userInteractionEnabled = !hidden;
+        _captionMixin.livePhotoButtonView.alpha = alpha;
+        _captionMixin.livePhotoButtonView.userInteractionEnabled = !hidden;
     }
     
     if (hidden)
@@ -1504,6 +1634,18 @@
     }
 }
 
+- (void)setupGifEditing {
+    if (![_currentItem conformsToProtocol:@protocol(TGModernGalleryEditableItem)])
+        return;
+    
+    TGModernGalleryItemView *currentItemView = _currentItemView;
+    bool sendableAsGif = [currentItemView isKindOfClass:[TGMediaPickerGalleryVideoItemView class]];
+    if (sendableAsGif)
+        [(TGMediaPickerGalleryVideoItemView *)currentItemView toggleSendAsGif:false];
+    
+    [_muteButton removeFromSuperview];
+}
+
 - (void)toggleSendAsGif
 {
     if (![_currentItem conformsToProtocol:@protocol(TGModernGalleryEditableItem)])
@@ -1512,7 +1654,20 @@
     TGModernGalleryItemView *currentItemView = _currentItemView;
     bool sendableAsGif = [currentItemView isKindOfClass:[TGMediaPickerGalleryVideoItemView class]];
     if (sendableAsGif)
-        [(TGMediaPickerGalleryVideoItemView *)currentItemView toggleSendAsGif];
+        [(TGMediaPickerGalleryVideoItemView *)currentItemView toggleSendAsGif:true];
+}
+
+- (void)toggleSendAsTelescope
+{
+    if (![_currentItem conformsToProtocol:@protocol(TGModernGalleryEditableItem)])
+        return;
+    
+    TGModernGalleryItemView *currentItemView = _currentItemView;
+    bool sendableAsTelescope = [currentItemView isKindOfClass:[TGMediaPickerGalleryVideoItemView class]];
+    if (sendableAsTelescope)
+        [(TGMediaPickerGalleryVideoItemView *)currentItemView toggleSendAsTelescope:_canSendTelescope dismissParent:^{
+             [self cancelButtonPressed];
+        }];
 }
 
 - (void)toggleGrouping
@@ -1624,7 +1779,6 @@
 - (void)immediateEditorTransitionIn {
     [self setSelectionInterfaceHidden:true animated:false];
     _captionMixin.inputPanelView.alpha = 0.0f;
-    _captionMixin.backgroundView.alpha = 0.0f;
     _portraitToolbarView.doneButton.alpha = 0.0f;
     _landscapeToolbarView.doneButton.alpha = 0.0f;
     
@@ -1642,12 +1796,11 @@
 {
     [self setSelectionInterfaceHidden:true animated:true];
     
-    [UIView animateWithDuration:0.2 animations:^
+    [UIView animateWithDuration:0.3 animations:^
     {
         _captionMixin.inputPanelView.alpha = 0.0f;
-        _captionMixin.backgroundView.alpha = 0.0f;
-        _portraitToolbarView.doneButton.alpha = 0.0f;
-        _landscapeToolbarView.doneButton.alpha = 0.0f;
+        _portraitToolbarView.alpha = 0.0f;
+        _landscapeToolbarView.alpha = 0.0f;
     }];
 }
 
@@ -1655,12 +1808,11 @@
 {
     [self setSelectionInterfaceHidden:false animated:true];
     
-    [UIView animateWithDuration:0.3 animations:^
+    [UIView animateWithDuration:0.2 animations:^
     {
         _captionMixin.inputPanelView.alpha = 1.0f;
-        _captionMixin.backgroundView.alpha = 1.0f;
-        _portraitToolbarView.doneButton.alpha = 1.0f;
-        _landscapeToolbarView.doneButton.alpha = 1.0f;
+        _portraitToolbarView.alpha = 1.0f;
+        _landscapeToolbarView.alpha = 1.0f;
     }];
 }
 
@@ -1696,6 +1848,7 @@
         if (view == _photoCounterButton
             || view == _checkButton
             || view == _muteButton
+            || view == _telescopeButton
             || view == _groupButton
             || view == _cameraButton
             || view == _coverButton
@@ -1704,6 +1857,7 @@
             || [view isDescendantOfView:_landscapeToolbarView]
             || [view isDescendantOfView:_selectedPhotosView]
             || [view isDescendantOfView:_captionMixin.inputPanelView]
+            || [view isDescendantOfView:_captionMixin.livePhotoButtonView]
             || ([view isDescendantOfView:_captionMixin.dismissView] && _captionMixin.dismissView.alpha > 0.0)
             || [view isKindOfClass:[TGMenuButtonView class]])
             
@@ -1769,7 +1923,38 @@
             break;
             
         default:
-            frame = CGRectMake(screenEdges.left + 5, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 26 - _safeAreaInset.bottom - panelInset - (hasHeaderView ? 64.0 : 0.0), _muteButton.frame.size.width, _muteButton.frame.size.height);
+            frame = CGRectMake(screenEdges.left + 5, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 26 - _safeAreaInset.bottom - panelInset - (hasHeaderView ? 74.0 : 0.0), _muteButton.frame.size.width, _muteButton.frame.size.height);
+            break;
+    }
+    
+    return frame;
+}
+
+
+- (CGRect)_telescopeButtonFrameForOrientation:(UIInterfaceOrientation)orientation screenEdges:(UIEdgeInsets)screenEdges hasHeaderView:(bool)hasHeaderView
+{
+    CGRect frame = CGRectZero;
+    if (_safeAreaInset.top > 20.0f)
+        screenEdges.top += _safeAreaInset.top;
+    screenEdges.left += _safeAreaInset.left;
+    screenEdges.right -= _safeAreaInset.right;
+    
+    CGFloat panelInset = 0.0f;
+    
+    CGRect muteButtonFrame = [self _muteButtonFrameForOrientation:orientation screenEdges:screenEdges hasHeaderView:hasHeaderView];
+    
+    switch (orientation)
+    {
+        case UIInterfaceOrientationLandscapeLeft:
+            frame = CGRectMake(screenEdges.right - 47, muteButtonFrame.origin.y - muteButtonFrame.size.height - 5, _telescopeButton.frame.size.width, _telescopeButton.frame.size.height);
+            break;
+            
+        case UIInterfaceOrientationLandscapeRight:
+            frame = CGRectMake(screenEdges.left + 5, muteButtonFrame.origin.y - muteButtonFrame.size.height - 5, _telescopeButton.frame.size.width, _telescopeButton.frame.size.height);
+            break;
+            
+        default:
+            frame = CGRectMake(muteButtonFrame.origin.x + muteButtonFrame.size.width + 5, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 26 - _safeAreaInset.bottom - panelInset - (hasHeaderView ? 74.0 : 0.0), _telescopeButton.frame.size.width, _telescopeButton.frame.size.height);
             break;
     }
     
@@ -1880,7 +2065,7 @@
             break;
     
         default:
-             frame = CGRectMake(screenEdges.right - 46 - _safeAreaInset.right - buttonInset, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 45 - _safeAreaInset.bottom - panelInset - (hasHeaderView ? 64.0 : 0.0), 44, 44);
+             frame = CGRectMake(screenEdges.right - 46 - _safeAreaInset.right - buttonInset, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 50 - _safeAreaInset.bottom - panelInset - (hasHeaderView ? 64.0 : 0.0), 44, 44);
             break;
     }
     
@@ -1993,6 +2178,8 @@
     CGFloat screenSide = MAX(screenSize.width, screenSize.height);
     UIEdgeInsets screenEdges = UIEdgeInsetsZero;
     
+    _portraitToolbarView.bottomInset = _safeAreaInset.bottom;
+    
     if (TGIsPad())
     {
         _landscapeToolbarView.hidden = true;
@@ -2026,7 +2213,7 @@
     _coverTitleLabel.frame = CGRectMake(screenEdges.left + floor((self.frame.size.width - _coverTitleLabel.frame.size.width) / 2.0), coverTitleTopY + 26, _coverTitleLabel.frame.size.width, _coverTitleLabel.frame.size.height);
     
     UIEdgeInsets captionEdgeInsets = screenEdges;
-    captionEdgeInsets.bottom = _portraitToolbarView.frame.size.height;
+    captionEdgeInsets.bottom = _portraitToolbarView.frame.size.height + 10.0;
     [_captionMixin updateLayoutWithFrame:self.bounds edgeInsets:captionEdgeInsets animated:false];
     
     switch (orientation)
@@ -2065,19 +2252,20 @@
         {
             [UIView performWithoutAnimation:^
             {
-                _photoCounterButton.frame = CGRectMake(screenEdges.right - 56 - _safeAreaInset.right, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 40 - _safeAreaInset.bottom - (hasHeaderView ? 46.0 : 0.0), 64, 38);
+                _photoCounterButton.frame = CGRectMake(screenEdges.right - 64 - _safeAreaInset.right, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - 50 - _safeAreaInset.bottom - (hasHeaderView ? 46.0 : 0.0), 64, 38);
                 
-                _selectedPhotosView.frame = CGRectMake(screenEdges.left + 4, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - photosViewSize - 54 - _safeAreaInset.bottom - (hasHeaderView ? 46.0 : 0.0), self.frame.size.width - 4 * 2 - _safeAreaInset.right, photosViewSize);
+                _selectedPhotosView.frame = CGRectMake(screenEdges.left + 4, screenEdges.bottom - TGPhotoEditorToolbarSize - [_captionMixin.inputPanel baseHeight] - photosViewSize - 64 - _safeAreaInset.bottom - (hasHeaderView ? 46.0 : 0.0), self.frame.size.width - 4 * 2 - _safeAreaInset.right, photosViewSize);
             }];
             
             _landscapeToolbarView.frame = CGRectMake(_landscapeToolbarView.frame.origin.x, screenEdges.top, TGPhotoEditorToolbarSize, self.frame.size.height);
             
-            _headerWrapperView.frame = CGRectMake(screenEdges.left, _portraitToolbarView.frame.origin.y - 64.0 - [_captionMixin.inputPanel baseHeight], self.frame.size.width, 72.0);
+            _headerWrapperView.frame = CGRectMake(screenEdges.left, _portraitToolbarView.frame.origin.y - 74.0 - [_captionMixin.inputPanel baseHeight], self.frame.size.width, 72.0);
         }
             break;
     }
     
     _muteButton.frame = [self _muteButtonFrameForOrientation:orientation screenEdges:screenEdges hasHeaderView:true];
+    _telescopeButton.frame = [self _telescopeButtonFrameForOrientation:orientation screenEdges:screenEdges hasHeaderView:true];
     _checkButton.frame = [self _checkButtonFrameForOrientation:orientation screenEdges:screenEdges hasHeaderView:hasHeaderView];
     _groupButton.frame = [self _groupButtonFrameForOrientation:orientation screenEdges:screenEdges hasHeaderView:hasHeaderView];
     _coverButton.frame = [self _coverButtonFrameForOrientation:orientation screenEdges:screenEdges hasHeaderView:hasHeaderView];

@@ -1,3 +1,4 @@
+import SGStrings
 import Foundation
 import UIKit
 import Display
@@ -80,15 +81,15 @@ private enum LogoutOptionsEntry: ItemListNodeEntry, Equatable {
             case let .alternativeHeader(_, title):
                 return ItemListSectionHeaderItem(presentationData: presentationData, text: title, sectionId: self.section)
             case let .addAccount(_, title, text):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesSettings.addAccount, title: title, label: text, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesSettings.deleteAddAccount, title: title, label: text, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.addAccount()
                 })
             case let .setPasscode(_, title, text):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesSettings.setPasscode, title: title, label: text, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesSettings.permissions, title: title, label: text, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.setPasscode()
                 })
             case let .clearCache(_, title, text):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesSettings.clearCache, title: title, label: text, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesSettings.dataAndStorage, title: title, label: text, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.clearCache()
                 })
             case let .changePhoneNumber(_, title, text):
@@ -139,15 +140,15 @@ public func logoutOptionsController(context: AccountContext, navigationControlle
         |> take(1)
         |> deliverOnMainQueue
         ).start(next: { accountAndPeer, accountsAndPeers in
-            var maximumAvailableAccounts: Int = 3
+            var maximumAvailableAccounts: Int = maximumSwiftgramNumberOfAccounts
             if accountAndPeer?.1.isPremium == true && !context.account.testingEnvironment {
-                maximumAvailableAccounts = 4
+                maximumAvailableAccounts = maximumSwiftgramNumberOfAccounts
             }
             var count: Int = 1
             for (accountContext, peer, _) in accountsAndPeers {
                 if !accountContext.account.testingEnvironment {
                     if peer.isPremium {
-                        maximumAvailableAccounts = 4
+                        maximumAvailableAccounts = maximumSwiftgramNumberOfAccounts
                     }
                     count += 1
                 }
@@ -165,7 +166,17 @@ public func logoutOptionsController(context: AccountContext, navigationControlle
                 }
                 pushControllerImpl?(controller)
             } else {
-                context.sharedContext.beginNewAuth(testingEnvironment: context.account.testingEnvironment)
+                if count + 1 > maximumSafeNumberOfAccounts {
+                    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                    let alertController = textAlertController(context: context, title: presentationData.strings.ChatList_DeleteSavedMessagesConfirmationTitle, text: i18n("Auth.AccountBackupReminder", presentationData.strings.baseLanguageCode), actions: [
+                        TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {
+                            context.sharedContext.beginNewAuth(testingEnvironment: context.account.testingEnvironment)
+                        })
+                    ], dismissOnOutsideTap: false)
+                    presentControllerImpl?(alertController, nil)
+                } else {
+                    context.sharedContext.beginNewAuth(testingEnvironment: context.account.testingEnvironment)
+                }
                 
                 dismissImpl?()
             }
@@ -224,7 +235,7 @@ public func logoutOptionsController(context: AccountContext, navigationControlle
                 
                 context.sharedContext.openResolvedUrl(resolvedUrl, context: context, urlContext: .generic, navigationController: navigationController, forceExternal: false, forceUpdate: false, openPeer: { peer, navigation in
                 }, sendFile: nil, sendSticker: nil, sendEmoji: nil, requestMessageActionUrlAuth: nil, joinVoiceChat: nil, present: { controller, arguments in
-                    pushControllerImpl?(controller)
+                    presentControllerImpl?(controller, nil)
                 }, dismissInput: {}, contentContext: nil, progress: nil, completion: nil)
             })
         }
@@ -292,7 +303,7 @@ public func logoutOptionsController(context: AccountContext, navigationControlle
         navigationController?.pushViewController(value, animated: false)
     }
     presentControllerImpl = { [weak controller] value, arguments in
-        controller?.present(value, in: .window(.root), with: arguments ?? ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+        controller?.present(value, in: .window(.root), with: arguments)
     }
     replaceTopControllerImpl = { [weak navigationController] c in
         navigationController?.replaceTopController(c, animated: true)

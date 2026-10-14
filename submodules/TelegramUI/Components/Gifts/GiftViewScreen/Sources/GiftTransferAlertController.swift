@@ -3,7 +3,6 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import ComponentFlow
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import AccountContext
@@ -34,10 +33,10 @@ public func giftTransferAlertController(
     let text: String
     let buttonText: String
     if transferStars > 0 {
-        text = strings.Gift_Transfer_Confirmation_Text("\(gift.title) #\(presentationStringsFormattedNumber(gift.number, presentationData.dateTimeFormat.groupingSeparator))", peer.displayTitle(strings: strings, displayOrder: presentationData.nameDisplayOrder), strings.Gift_Transfer_Confirmation_Text_Stars(Int32(clamping: transferStars))).string
+        text = strings.Gift_Transfer_Confirmation_Text("\(gift.title) #\(formatCollectibleNumber(gift.number, dateTimeFormat: presentationData.dateTimeFormat))", peer.displayTitle(strings: strings, displayOrder: presentationData.nameDisplayOrder), strings.Gift_Transfer_Confirmation_Text_Stars(Int32(clamping: transferStars))).string
         buttonText = "\(strings.Gift_Transfer_Confirmation_Transfer)  $  \(transferStars)"
     } else {
-        text = strings.Gift_Transfer_Confirmation_TextFree("\(gift.title) #\(presentationStringsFormattedNumber(gift.number, presentationData.dateTimeFormat.groupingSeparator))", peer.displayTitle(strings: strings, displayOrder: presentationData.nameDisplayOrder)).string
+        text = strings.Gift_Transfer_Confirmation_TextFree("\(gift.title) #\(formatCollectibleNumber(gift.number, dateTimeFormat: presentationData.dateTimeFormat))", peer.displayTitle(strings: strings, displayOrder: presentationData.nameDisplayOrder)).string
         buttonText = strings.Gift_Transfer_Confirmation_TransferFree
     }
     
@@ -118,7 +117,7 @@ public func giftTransferAlertController(
                 HStack(items, spacing: 4.0)
             )
             
-            tableItems.append(TableComponent.Item(
+            tableItems.append(.init(
                 id: id,
                 title: title,
                 hasBackground: false,
@@ -165,12 +164,12 @@ public func giftTransferAlertController(
             AlertTextComponent(content: .plain(text))
         )
     ))
-    let tableComponent = AnyComponent(AlertTableComponent(items: tableItems))
-    let tableEntry = AnyComponentWithIdentity<AlertComponentEnvironment>(
+    content.append(AnyComponentWithIdentity(
         id: "table",
-        component: tableComponent
-    )
-    content.append(tableEntry)
+        component: AnyComponent(
+            AlertTableComponent(items: tableItems)
+        )
+    ))
     
     let alertController = ChatMessagePaymentAlertController(
         context: context,

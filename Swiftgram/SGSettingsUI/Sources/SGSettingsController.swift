@@ -63,6 +63,7 @@ private enum SGBoolSetting: String {
     case storyStealthMode
     case disableSwipeToRecordStory
     case disableDeleteChatSwipeOption
+    case quickTranslateButton
     case hideReactions
     case showRepostToStory
     case contextShowSelectFromUser
@@ -138,9 +139,8 @@ private struct SGSettingsControllerState: Equatable {
 }
 
 private typealias SGControllerEntry = SGItemListUIEntry<SGControllerSection, SGBoolSetting, SGSliderSetting, SGOneFromManySetting, SGDisclosureLink, AnyHashable>
-private typealias SGControllerArguments = SGItemListArguments<SGBoolSetting, SGSliderSetting, SGOneFromManySetting, SGDisclosureLink, AnyHashable>
 
-private func SGControllerEntries(presentationData: PresentationData, callListSettings: CallListSettings, experimentalUISettings: ExperimentalUISettings, appConfiguration _: AppConfiguration, nameColors: PeerNameColors, state: SGSettingsControllerState) -> [SGControllerEntry] {
+private func SGControllerEntries(presentationData: PresentationData, callListSettings: CallListSettings, experimentalUISettings: ExperimentalUISettings, appConfiguration: AppConfiguration, nameColors: PeerNameColors, state: SGSettingsControllerState) -> [SGControllerEntry] {
     
     let lang = presentationData.strings.baseLanguageCode
     let strings = presentationData.strings
@@ -162,7 +162,11 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
         id.increment(3)
     }
     
-    entries.append(.disclosure(id: id.count, section: .content, link: .contentSettings, text: i18n("Settings.ContentSettings", lang)))
+    if appConfiguration.sgWebSettings.global.canEditSettings {
+        entries.append(.disclosure(id: id.count, section: .content, link: .contentSettings, text: i18n("Settings.ContentSettings", lang)))
+    } else {
+        id.increment(1)
+    }
     
     entries.append(.header(id: id.count, section: .tabs, text: i18n("Settings.Tabs.Header", lang), badge: nil))
     entries.append(.toggle(id: id.count, section: .tabs, settingName: .hideTabBar, value: SGSimpleSettings.shared.hideTabBar, text: i18n("Settings.Tabs.HideTabBar", lang), enabled: true))
@@ -220,6 +224,7 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     } else {
         id.increment(1)
     }
+    entries.append(.toggle(id: id.count, section: .translation, settingName: .quickTranslateButton, value: SGSimpleSettings.shared.quickTranslateButton, text: i18n("Settings.Translation.QuickTranslateButton", lang), enabled: true))
     entries.append(.disclosure(id: id.count, section: .translation, link: .languageSettings, text: strings.Localization_TranslateEntireChat))
     entries.append(.notice(id: id.count, section: .translation, text: i18n("Common.NoTelegramPremiumNeeded", lang, strings.Settings_Premium)))
 
@@ -349,7 +354,7 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
     
     let simplePromise = ValuePromise(true, ignoreRepeated: false)
     
-    let arguments = SGControllerArguments(
+    let arguments = SGItemListArguments<SGBoolSetting, SGSliderSetting, SGOneFromManySetting, SGDisclosureLink, AnyHashable>(
         context: context,
         /*updatePeerColor: { color in
           updateState { state in
@@ -409,6 +414,8 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             SGSimpleSettings.shared.storyStealthMode = value
         case .disableSwipeToRecordStory:
             SGSimpleSettings.shared.disableSwipeToRecordStory = value
+        case .quickTranslateButton:
+            SGSimpleSettings.shared.quickTranslateButton = value
         case .uploadSpeedBoost:
             SGSimpleSettings.shared.uploadSpeedBoost = value
         case .hideReactions:
@@ -701,11 +708,11 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
     contentSettingsConfiguration.set(.single(nil)
     |> then(updatedContentSettingsConfiguration))
     
-    let signal: Signal<(ItemListControllerState, (ItemListNodeState, SGControllerArguments)), NoError> = combineLatest(simplePromise.get(), /*sliderPromise.get(),*/ statePromise.get(), context.sharedContext.presentationData, sharedData, preferences, contentSettingsConfiguration.get(),
+    let signal = combineLatest(simplePromise.get(), /*sliderPromise.get(),*/ statePromise.get(), context.sharedContext.presentationData, sharedData, preferences, contentSettingsConfiguration.get(),
         context.engine.accountData.observeAvailableColorOptions(scope: .replies),
         context.engine.accountData.observeAvailableColorOptions(scope: .profile)
     )
-    |> map { _, /*sliderValue,*/ state, presentationData, sharedData, view, contentSettingsConfiguration, availableReplyColors, availableProfileColors ->  (ItemListControllerState, (ItemListNodeState, SGControllerArguments)) in
+    |> map { _, /*sliderValue,*/ state, presentationData, sharedData, view, contentSettingsConfiguration, availableReplyColors, availableProfileColors ->  (ItemListControllerState, (ItemListNodeState, Any)) in
         
         let appConfiguration: AppConfiguration = view.values[PreferencesKeys.appConfiguration]?.get(AppConfiguration.self) ?? AppConfiguration.defaultValue
         let callListSettings: CallListSettings = sharedData.entries[ApplicationSpecificSharedDataKeys.callListSettings]?.get(CallListSettings.self) ?? CallListSettings.defaultSettings

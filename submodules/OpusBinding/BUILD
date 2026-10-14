@@ -24,8 +24,6 @@ objc_library(
     ],
     sdk_frameworks = [
         "Foundation",
-        "AVFoundation",
-        "AudioToolbox",
     ],
     visibility = [
         "//visibility:public",

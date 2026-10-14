@@ -134,6 +134,16 @@ public final class VideoPlaybackControlsComponent: Component {
             }
         }
         
+        override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            guard let result = super.hitTest(point, with: event) else {
+                return nil
+            }
+            if result === self {
+                return nil
+            }
+            return result
+        }
+        
         func update(component: VideoPlaybackControlsComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
             let isVisibleChanged = self.component?.isVisible != component.isVisible
             
@@ -159,7 +169,7 @@ public final class VideoPlaybackControlsComponent: Component {
             self.backgroundContainer.update(size: CGSize(width: size.width + containerInset * 2.0, height: size.height + containerInset * 2.0), isDark: true, transition: transition)
             
             let areSideButtonsVisible = component.isVisible && component.displaySeekControls
-            let buttonsTintColor: GlassBackgroundView.TintColor = .init(kind: .custom, color: UIColor(white: 0.0, alpha: 0.2))
+            let buttonsTintColor: GlassBackgroundView.TintColor = .init(kind: .custom(style: .clear, color: UIColor(white: 0.0, alpha: 0.2)))
             
             transition.setFrame(view: self.leftButtonBackgroundView, frame: leftButtonFrame)
             self.leftButtonBackgroundView.update(size: leftButtonFrame.size, cornerRadius: leftButtonFrame.height * 0.5, isDark: true, tintColor: buttonsTintColor, isInteractive: true, isVisible: areSideButtonsVisible, transition: transition)
@@ -167,6 +177,7 @@ public final class VideoPlaybackControlsComponent: Component {
             self.leftIconView.update(size: leftButtonFrame.size)
             transition.setAlpha(view: self.leftIconView, alpha: areSideButtonsVisible ? 1.0 : 0.0)
             transition.setBlur(layer: self.leftIconView.layer, radius: areSideButtonsVisible ? 0.0 : 10.0)
+            self.leftButtonBackgroundView.isUserInteractionEnabled = areSideButtonsVisible
             
             transition.setFrame(view: self.rightButtonBackgroundView, frame: rightButtonFrame)
             self.rightButtonBackgroundView.update(size: rightButtonFrame.size, cornerRadius: rightButtonFrame.height * 0.5, isDark: true, tintColor: buttonsTintColor, isInteractive: true, isVisible: areSideButtonsVisible, transition: transition)
@@ -174,6 +185,7 @@ public final class VideoPlaybackControlsComponent: Component {
             self.rightIconView.update(size: rightButtonFrame.size)
             transition.setAlpha(view: self.rightIconView, alpha: areSideButtonsVisible ? 1.0 : 0.0)
             transition.setBlur(layer: self.rightIconView.layer, radius: areSideButtonsVisible ? 0.0 : 10.0)
+            self.rightButtonBackgroundView.isUserInteractionEnabled = areSideButtonsVisible
             
             transition.setFrame(view: self.centerButtonBackgroundView, frame: centerButtonFrame)
             self.centerButtonBackgroundView.update(size: centerButtonFrame.size, cornerRadius: centerButtonFrame.height * 0.5, isDark: true, tintColor: buttonsTintColor, isInteractive: true, isVisible: component.isVisible, transition: transition)

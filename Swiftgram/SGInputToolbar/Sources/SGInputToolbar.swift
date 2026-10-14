@@ -8,6 +8,7 @@ public struct ChatToolbarView: View {
     var onSpoiler: () -> Void
     var onBold: () -> Void
     var onItalic: () -> Void
+    var onDate: (() -> Void)?
     var onMonospace: () -> Void
     var onLink: () -> Void
     var onStrikethrough: () -> Void
@@ -24,6 +25,7 @@ public struct ChatToolbarView: View {
         onSpoiler: @escaping () -> Void,
         onBold: @escaping () -> Void,
         onItalic: @escaping () -> Void,
+        onDate: (() -> Void)? = nil,
         onMonospace: @escaping () -> Void,
         onLink: @escaping () -> Void,
         onStrikethrough: @escaping () -> Void,
@@ -37,6 +39,7 @@ public struct ChatToolbarView: View {
         self.onSpoiler = onSpoiler
         self.onBold = onBold
         self.onItalic = onItalic
+        self.onDate = onDate
         self.onMonospace = onMonospace
         self.onLink = onLink
         self.onStrikethrough = onStrikethrough
@@ -88,6 +91,13 @@ public struct ChatToolbarView: View {
                     Image(systemName: "italic")
                 }
                 .buttonStyle(ToolbarButtonStyle())
+
+                if let onDate {
+                    Button(action: onDate) {
+                        Image(systemName: "calendar")
+                    }
+                    .buttonStyle(ToolbarButtonStyle())
+                }
                 
                 // Monospace Button
                 Button(action: onMonospace) {
@@ -206,4 +216,3 @@ struct ToolbarButtonStyle: ButtonStyle {
             .animation(nil, value: configuration.isPressed)
     }
 }
-

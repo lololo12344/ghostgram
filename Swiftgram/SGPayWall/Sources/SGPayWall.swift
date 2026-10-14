@@ -353,7 +353,7 @@ struct SGPayWallView: View {
     private let buyErrorPub = NotificationCenter.default.publisher(for: .SGIAPHelperErrorNotification, object: nil)
     private let validationErrorPub = NotificationCenter.default.publisher(for: .SGIAPHelperValidationErrorNotification, object: nil)
     
-    @State private var statusDisposable = MetaDisposable()
+    @State private var statusTask: Task<Void, Never>? = nil
     
     @State private var hapticFeedback: HapticFeedback?
     private let confettiDuration: Double = 5.0
@@ -443,26 +443,34 @@ struct SGPayWallView: View {
         .onAppear {
             hapticFeedback = HapticFeedback()
             updateSelectedProduct()
-            statusDisposable.set((statusSignal
-            |> deliverOnMainQueue).start(next: { newStatus in
-                #if DEBUG
-                print("SGPayWallView: newStatus = \(newStatus)")
-                #endif
-                
-                if currentStatus != newStatus {
-                    currentStatus = newStatus
+            statusTask = Task {
+                let statusStream = statusSignal.awaitableStream()
+                for await newStatus in statusStream {
+                    #if DEBUG
+                    print("SGPayWallView: newStatus = \(newStatus)")
+                    #endif
+                    if Task.isCancelled {
+                        #if DEBUG
+                        print("statusTask cancelled")
+                        #endif
+                        break
+                    }
                     
-                    if newStatus > 1 {
-                        handleUpgradedStatus()
+                    if currentStatus != newStatus {
+                        currentStatus = newStatus
+
+                        if newStatus > 1 {
+                            handleUpgradedStatus()
+                        }
                     }
                 }
-            }))
+            }
         }
         .onDisappear {
             #if DEBUG
-            print("Disposing status signal subscription")
+            print("Cancelling statusTask")
             #endif
-            statusDisposable.set(nil)
+            statusTask?.cancel()
         }
         .onReceive(buyOrRestoreSuccessPub) { _ in
             state = .validating

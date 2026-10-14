@@ -200,6 +200,12 @@ public final class LegacySwiftUIController: LegacyController {
         }
     }
 
+    override public func bind(controller: UIViewController) {
+        super.bind(controller: controller)
+        addChild(legacyController)
+        legacyController.didMove(toParent: legacyController)
+    }
+
     @available(*, unavailable)
     public required init(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")

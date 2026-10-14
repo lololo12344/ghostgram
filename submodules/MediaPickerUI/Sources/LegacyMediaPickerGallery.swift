@@ -3,7 +3,6 @@ import UIKit
 import Display
 import SwiftSignalKit
 import TelegramCore
-import Postbox
 import SSignalKit
 import TelegramPresentationData
 import AccountContext
@@ -13,7 +12,16 @@ import LegacyMediaPickerUI
 import Photos
 import MediaAssetsContext
 
-private func galleryFetchResultItems(fetchResult: PHFetchResult<PHAsset>, index: Int, reversed: Bool, selectionContext: TGMediaSelectionContext?, editingContext: TGMediaEditingContext, stickersContext: TGPhotoPaintStickersContext, immediateThumbnail: UIImage?) -> ([TGModernGalleryItem], TGModernGalleryItem?) {
+private func galleryFetchResultItems(
+    fetchResult: PHFetchResult<PHAsset>,
+    index: Int,
+    reversed: Bool,
+    selectionContext: TGMediaSelectionContext?,
+    editingContext: TGMediaEditingContext,
+    stickersContext: TGPhotoPaintStickersContext,
+    immediateThumbnail: UIImage?,
+    asFile: Bool
+) -> ([TGModernGalleryItem], TGModernGalleryItem?) {
     var focusItem: TGModernGalleryItem?
     var galleryItems: [TGModernGalleryItem] = []
     
@@ -24,6 +32,7 @@ private func galleryFetchResultItems(fetchResult: PHFetchResult<PHAsset>, index:
             galleryItem.selectionContext = selectionContext
             galleryItem.editingContext = editingContext
             galleryItem.stickersContext = stickersContext
+            galleryItem.asFile = asFile
             galleryItems.append(galleryItem)
             
             if i == index {
@@ -101,7 +110,35 @@ enum LegacyMediaPickerGallerySource {
     case selection(item: TGMediaSelectableItem)
 }
 
-func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?, threadTitle: String?, chatLocation: ChatLocation?, isScheduledMessages: Bool, presentationData: PresentationData, source: LegacyMediaPickerGallerySource, immediateThumbnail: UIImage?, selectionContext: TGMediaSelectionContext?, editingContext: TGMediaEditingContext, hasSilentPosting: Bool, hasSchedule: Bool, hasTimer: Bool, updateHiddenMedia: @escaping (String?) -> Void, initialLayout: ContainerViewLayout?, transitionHostView: @escaping () -> UIView?, transitionView: @escaping (String) -> UIView?, completed: @escaping (TGMediaSelectableItem & TGMediaEditableItem, Bool, Int32?, @escaping () -> Void) -> Void, presentSchedulePicker: @escaping (Bool, @escaping (Int32) -> Void) -> Void, presentTimerPicker: @escaping (@escaping (Int32) -> Void) -> Void, getCaptionPanelView: @escaping () -> TGCaptionPanelView?, present: @escaping (ViewController, Any?) -> Void, finishedTransitionIn: @escaping () -> Void, willTransitionOut: @escaping () -> Void, dismissAll: @escaping () -> Void, editCover: @escaping (CGSize, @escaping (UIImage) -> Void) -> Void = { _, _ in }) -> TGModernGalleryController {
+func presentLegacyMediaPickerGallery(
+    context: AccountContext,
+    peer: EnginePeer?,
+    threadTitle: String?,
+    chatLocation: ChatLocation?,
+    isScheduledMessages: Bool,
+    presentationData: PresentationData,
+    source: LegacyMediaPickerGallerySource,
+    immediateThumbnail: UIImage?,
+    selectionContext: TGMediaSelectionContext?,
+    editingContext: TGMediaEditingContext,
+    asFile: Bool,
+    hasSilentPosting: Bool,
+    hasSchedule: Bool,
+    hasTimer: Bool,
+    updateHiddenMedia: @escaping (String?) -> Void,
+    initialLayout: ContainerViewLayout?,
+    transitionHostView: @escaping () -> UIView?,
+    transitionView: @escaping (String) -> UIView?,
+    completed: @escaping (TGMediaSelectableItem & TGMediaEditableItem, Bool, Int32?, @escaping () -> Void) -> Void,
+    presentSchedulePicker: @escaping (Bool, @escaping (Int32, Bool) -> Void) -> Void,
+    presentTimerPicker: @escaping (@escaping (Int32) -> Void) -> Void,
+    getCaptionPanelView: @escaping () -> TGCaptionPanelView?,
+    present: @escaping (ViewController, Any?) -> Void,
+    finishedTransitionIn: @escaping () -> Void,
+    willTransitionOut: @escaping () -> Void,
+    dismissAll: @escaping () -> Void,
+    editCover: @escaping (CGSize, @escaping (UIImage) -> Void) -> Void = { _, _ in }
+) -> TGModernGalleryController {
     let reminder = peer?.id == context.account.peerId
     let hasSilentPosting = hasSilentPosting && peer?.id != context.account.peerId
     var hasCoverButton = false
@@ -115,8 +152,30 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
     legacyController.statusBar.statusBarStyle = presentationData.theme.rootController.statusBarStyle.style
     
     let paintStickersContext = LegacyPaintStickersContext(context: context)
+    paintStickersContext.presentMediaPickerSendActionMenu = makeLegacyMediaPickerSendActionMenuPresenter(context: context, presentationData: presentationData, presentInGlobalOverlay: { [weak legacyController] controller in
+        if let legacyController {
+            legacyController.presentInGlobalOverlay(controller)
+        } else if let mainWindow = context.sharedContext.mainWindow {
+            mainWindow.presentInGlobalOverlay(controller)
+        } else {
+            context.sharedContext.presentGlobalController(controller, nil)
+        }
+    })
     paintStickersContext.captionPanelView = {
         return getCaptionPanelView()
+    }
+    paintStickersContext.livePhotoButton = {
+        if case .secretChat = peer {
+            return nil
+        } else if peer == nil {
+            return nil
+        }
+        let livePhotoButton = LivePhotoButton(context: context)
+        livePhotoButton.present = present
+        return livePhotoButton
+    }
+    paintStickersContext.photoToolbarView = { backButton, doneButton, solidBackground, hasSendStarsButton in
+        return makeMediaPickerPhotoToolbarView(context: context, backButton: backButton, doneButton: doneButton, solidBackground: solidBackground, hasSendStarsButton: hasSendStarsButton)
     }
     paintStickersContext.editCover = { dimensions, completion in
         editCover(dimensions, completion)
@@ -128,10 +187,10 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
     
     let (items, focusItem): ([TGModernGalleryItem], TGModernGalleryItem?)
     switch source {
-        case let .fetchResult(fetchResult, index, reversed):
-            (items, focusItem) = galleryFetchResultItems(fetchResult: fetchResult, index: index, reversed: reversed, selectionContext: selectionContext, editingContext: editingContext, stickersContext: paintStickersContext, immediateThumbnail: immediateThumbnail)
-        case let .selection(item):
-            (items, focusItem) = gallerySelectionItems(item: item, selectionContext: selectionContext, editingContext: editingContext, stickersContext: paintStickersContext, immediateThumbnail: immediateThumbnail)
+    case let .fetchResult(fetchResult, index, reversed):
+        (items, focusItem) = galleryFetchResultItems(fetchResult: fetchResult, index: index, reversed: reversed, selectionContext: selectionContext, editingContext: editingContext, stickersContext: paintStickersContext, immediateThumbnail: immediateThumbnail, asFile: asFile)
+    case let .selection(item):
+        (items, focusItem) = gallerySelectionItems(item: item, selectionContext: selectionContext, editingContext: editingContext, stickersContext: paintStickersContext, immediateThumbnail: immediateThumbnail)
     }
     
     let recipientName: String?
@@ -144,14 +203,30 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
             recipientName = peer?.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
         }
     }
-    let model = TGMediaPickerGalleryModel(context: legacyController.context, items: items, focus: focusItem, selectionContext: selectionContext, editingContext: editingContext, hasCaptions: true, allowCaptionEntities: true, hasTimer: hasTimer, onlyCrop: false, inhibitDocumentCaptions: false, hasSelectionPanel: true, hasCamera: false, recipientName: recipientName, isScheduledMessages: isScheduledMessages, hasCoverButton: hasCoverButton)!
+    let currentAppConfiguration = context.currentAppConfiguration.with { $0 }
+    let model = TGMediaPickerGalleryModel(
+        context: legacyController.context,
+        items: items,
+        focus: focusItem,
+        selectionContext: selectionContext,
+        editingContext: editingContext,
+        hasCaptions: true,
+        allowCaptionEntities: true,
+        hasTimer: hasTimer,
+        onlyCrop: false,
+        inhibitDocumentCaptions: false,
+        hasSelectionPanel: true,
+        hasCamera: false,
+        recipientName: recipientName,
+        isScheduledMessages: isScheduledMessages,
+        canShowTelescope: currentAppConfiguration.sgWebSettings.global.canShowTelescope,
+        canSendTelescope: currentAppConfiguration.sgWebSettings.user.canSendTelescope,
+        hasCoverButton: hasCoverButton
+    )!
     model.stickersContext = paintStickersContext
     controller.model = model
     model.controller = controller
-    model.willFinishEditingItem = { (item: TGMediaEditableItem?, adjustments: TGMediaEditAdjustments?, representation: Any?, hasChanges: Bool) in
-        guard let item else {
-            return
-        }
+    model.willFinishEditingItem = { item, adjustments, representation, hasChanges in
         if hasChanges {
             editingContext.setAdjustments(adjustments, for: item)
             editingContext.setTemporaryRep(representation, for: item)
@@ -161,16 +236,10 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
             selectionContext.setItem(item, selected: true)
         }
     }
-    model.didFinishEditingItem = { (item: TGMediaEditableItem?, adjustments: TGMediaEditAdjustments?, result: UIImage?, thumbnail: UIImage?) in
-        guard let item, let result, let thumbnail else {
-            return
-        }
+    model.didFinishEditingItem = { item, adjustments, result, thumbnail in
         editingContext.setImage(result, thumbnailImage: thumbnail, for: item, synchronous: false)
     }
-    model.saveItemCaption = { (item: TGMediaEditableItem?, caption: NSAttributedString?) in
-        guard let item else {
-            return
-        }
+    model.saveItemCaption = { item, caption in
         editingContext.setCaption(caption, for: item)
         if let selectionContext = selectionContext, let caption = caption, caption.length > 0, let item = item as? TGMediaSelectableItem {
             selectionContext.setItem(item, selected: true)
@@ -234,7 +303,7 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
         legacyController?.dismiss()
     }
 
-    model.interfaceView.donePressed = { [weak controller] (item: TGModernGalleryItem?) in
+    model.interfaceView.donePressed = { [weak controller] item in
         if let item = item as? TGMediaPickerGalleryItem {
             completed(item.asset, false, nil, {
                 controller?.dismissWhenReady(animated: true)
@@ -243,7 +312,7 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
         }
     }
     if !isScheduledMessages && peer != nil {
-        model.interfaceView.doneLongPressed = { [weak selectionContext, weak editingContext, weak legacyController, weak model] (item: TGModernGalleryItem?) in
+        model.interfaceView.doneLongPressed = { [weak selectionContext, weak editingContext, weak legacyController, weak model, weak paintStickersContext] item, sourceView in
             if let legacyController = legacyController, let item = item as? TGMediaPickerGalleryItem, let model = model, let selectionContext = selectionContext {
                 var effectiveHasSchedule = hasSchedule
                 
@@ -289,37 +358,35 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
                 let _ = (sendWhenOnlineAvailable
                 |> take(1)
                 |> deliverOnMainQueue).start(next: { sendWhenOnlineAvailable in
-                    let legacySheetController = LegacyController(presentation: .custom, theme: presentationData.theme, initialLayout: nil)
-                    let sheetController = TGMediaPickerSendActionSheetController(context: legacyController.context, isDark: true, sendButtonFrame: model.interfaceView.doneButtonFrame, canSendSilently: hasSilentPosting, canSendWhenOnline: sendWhenOnlineAvailable && effectiveHasSchedule, canSchedule: effectiveHasSchedule, reminder: reminder, hasTimer: hasTimer)
                     let dismissImpl = { [weak model] in
                         model?.dismiss(true, false)
                         dismissAll()
                     }
-                    sheetController.send = {
+                    let send = {
                         completed(item.asset, false, nil, {
                             dismissImpl()
                         })
                     }
-                    sheetController.sendSilently = { [weak model] in
+                    let sendSilently = { [weak model] in
                         model?.interfaceView.onDismiss()
                         
                         completed(item.asset, true, nil, {
                             dismissImpl()
                         })
                     }
-                    sheetController.sendWhenOnline = {
+                    let sendWhenOnline = {
                         completed(item.asset, false, scheduleWhenOnlineTimestamp, {
                             dismissImpl()
                         })
                     }
-                    sheetController.schedule = {
-                        presentSchedulePicker(true, { time in
-                            completed(item.asset, false, time, {
+                    let schedule = {
+                        presentSchedulePicker(true, { time, silentPosting in
+                            completed(item.asset, silentPosting, time, {
                                 dismissImpl()
                             })
                         })
                     }
-                    sheetController.sendWithTimer = {
+                    let sendWithTimer = {
                         presentTimerPicker { time in
                             var items = selectionContext.selectedItems() ?? []
                             items.append(item.asset as Any)
@@ -333,6 +400,20 @@ func presentLegacyMediaPickerGallery(context: AccountContext, peer: EnginePeer?,
                             })
                         }
                     }
+
+                    if let sourceView, let paintStickersContext, paintStickersContext.presentMediaPickerSendActionMenu?(sourceView, hasSilentPosting, sendWhenOnlineAvailable && effectiveHasSchedule, effectiveHasSchedule, reminder, hasTimer, sendSilently, sendWhenOnline, schedule, sendWithTimer) == true {
+                        let hapticFeedback = HapticFeedback()
+                        hapticFeedback.impact()
+                        return
+                    }
+
+                    let legacySheetController = LegacyController(presentation: .custom, theme: presentationData.theme, initialLayout: nil)
+                    let sheetController = TGMediaPickerSendActionSheetController(context: legacyController.context, isDark: true, sendButtonFrame: model.interfaceView.doneButtonFrame, canSendSilently: hasSilentPosting, canSendWhenOnline: sendWhenOnlineAvailable && effectiveHasSchedule, canSchedule: effectiveHasSchedule, reminder: reminder, hasTimer: hasTimer)
+                    sheetController.send = send
+                    sheetController.sendSilently = sendSilently
+                    sheetController.sendWhenOnline = sendWhenOnline
+                    sheetController.schedule = schedule
+                    sheetController.sendWithTimer = sendWithTimer
                     sheetController.customDismissBlock = { [weak legacySheetController] in
                         legacySheetController?.dismiss()
                     }

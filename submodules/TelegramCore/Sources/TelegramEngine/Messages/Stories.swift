@@ -262,6 +262,7 @@ public enum Stories {
             case isMy
             case myReaction
             case forwardInfo
+            case music
             case authorId
             case folderIds
         }
@@ -287,6 +288,7 @@ public enum Stories {
         public let isMy: Bool
         public let myReaction: MessageReaction.Reaction?
         public let forwardInfo: ForwardInfo?
+        public let music: TelegramMediaFile?
         public let authorId: PeerId?
         public let folderIds: [Int64]?
         
@@ -316,6 +318,7 @@ public enum Stories {
             isMy: Bool,
             myReaction: MessageReaction.Reaction?,
             forwardInfo: ForwardInfo?,
+            music: TelegramMediaFile?,
             authorId: PeerId?,
             folderIds: [Int64]?
         ) {
@@ -340,6 +343,7 @@ public enum Stories {
             self.isMy = isMy
             self.myReaction = myReaction
             self.forwardInfo = forwardInfo
+            self.music = music
             self.authorId = authorId
             self.folderIds = folderIds
         }
@@ -388,6 +392,13 @@ public enum Stories {
             self.isMy = try container.decodeIfPresent(Bool.self, forKey: .isMy) ?? false
             self.myReaction = try container.decodeIfPresent(MessageReaction.Reaction.self, forKey: .myReaction)
             self.forwardInfo = try container.decodeIfPresent(ForwardInfo.self, forKey: .forwardInfo)
+            
+            if let musicData = try container.decodeIfPresent(Data.self, forKey: .music) {
+                self.music = PostboxDecoder(buffer: MemoryBuffer(data: musicData)).decodeRootObject() as? TelegramMediaFile
+            } else {
+                self.music = nil
+            }
+            
             self.authorId = try container.decodeIfPresent(Int64.self, forKey: .authorId).flatMap { PeerId($0) }
             self.folderIds = try container.decodeIfPresent([Int64].self, forKey: .folderIds)
         }
@@ -430,6 +441,14 @@ public enum Stories {
             try container.encode(self.isMy, forKey: .isMy)
             try container.encodeIfPresent(self.myReaction, forKey: .myReaction)
             try container.encodeIfPresent(self.forwardInfo, forKey: .forwardInfo)
+            
+            if let music = self.music {
+                let encoder = PostboxEncoder()
+                encoder.encodeRootObject(music)
+                let musicData = encoder.makeData()
+                try container.encode(musicData, forKey: .music)
+            }
+            
             try container.encodeIfPresent(self.authorId?.toInt64(), forKey: .authorId)
             try container.encodeIfPresent(self.folderIds, forKey: .folderIds)
         }
@@ -503,6 +522,15 @@ public enum Stories {
             }
             if lhs.forwardInfo != rhs.forwardInfo {
                 return false
+            }
+            if let lhsMusic = lhs.music, let rhsMusic = rhs.music {
+                if !lhsMusic.isEqual(to: rhsMusic) {
+                    return false
+                }
+            } else {
+                if (lhs.music == nil) != (rhs.music == nil) {
+                    return false
+                }
             }
             if lhs.authorId != rhs.authorId {
                 return false
@@ -874,6 +902,16 @@ public enum StoryUploadResult {
     case completed(Int32?)
 }
 
+enum PendingStoryUploadInternalPhase {
+    case processing
+    case uploading
+}
+
+enum PendingStoryUploadResult {
+    case progress(Float, PendingStoryUploadInternalPhase)
+    case completed(Int32?)
+}
+
 private func prepareUploadStoryContent(account: Account, media: EngineStoryInputMedia) -> Media {
     switch media {
     case let .image(dimensions, data, _):
@@ -1025,7 +1063,23 @@ public struct StoryUploadInfo: Codable, Equatable {
     }
 }
 
-func _internal_uploadStory(account: Account, target: Stories.PendingTarget, media: EngineStoryInputMedia, mediaAreas: [MediaArea], text: String, entities: [MessageTextEntity], pin: Bool, privacy: EngineStoryPrivacy, isForwardingDisabled: Bool, period: Int, randomId: Int64, forwardInfo: Stories.PendingForwardInfo?, folders: [Int64], uploadInfo: StoryUploadInfo? = nil) -> Signal<Int32, NoError> {
+func _internal_uploadStory(
+    account: Account,
+    target: Stories.PendingTarget,
+    media: EngineStoryInputMedia,
+    mediaAreas: [MediaArea],
+    text: String,
+    entities: [MessageTextEntity],
+    pin: Bool,
+    privacy: EngineStoryPrivacy,
+    isForwardingDisabled: Bool,
+    period: Int,
+    randomId: Int64,
+    forwardInfo: Stories.PendingForwardInfo?,
+    folders: [Int64],
+    music: TelegramMediaFile?,
+    uploadInfo: StoryUploadInfo? = nil
+) -> Signal<Int32, NoError> {
     let inputMedia = prepareUploadStoryContent(account: account, media: media)
     
     return (account.postbox.transaction { transaction in
@@ -1055,6 +1109,7 @@ func _internal_uploadStory(account: Account, target: Stories.PendingTarget, medi
             randomId: randomId,
             forwardInfo: forwardInfo,
             folders: folders,
+            music: music,
             uploadInfo: uploadInfo
         ))
         transaction.setLocalStoryState(state: CodableEntry(currentState))
@@ -1103,6 +1158,7 @@ func _internal_cancelStoryUpload(account: Account, stableId: Int32) {
                             randomId: currentState.items[i].randomId,
                             forwardInfo: currentState.items[i].forwardInfo,
                             folders: currentState.items[i].folders,
+                            music: currentState.items[i].music,
                             uploadInfo: StoryUploadInfo(
                                 groupingId: groupingId,
                                 index: newIndex,
@@ -1193,6 +1249,7 @@ func _internal_beginStoryLivestream(account: Account, peerId: EnginePeer.Id, rtm
                                     isMy: item.isMy,
                                     myReaction: item.myReaction,
                                     forwardInfo: item.forwardInfo.flatMap { EngineStoryItem.ForwardInfo($0, transaction: transaction) },
+                                    music: item.music.flatMap(EngineMedia.init),
                                     author: item.authorId.flatMap { transaction.getPeer($0).flatMap(EnginePeer.init) },
                                     folderIds: item.folderIds
                                 )
@@ -1269,9 +1326,10 @@ func _internal_uploadStoryImpl(
     isForwardingDisabled: Bool,
     period: Int,
     folders: [Int64],
+    music: TelegramMediaFile?,
     randomId: Int64,
     forwardInfo: Stories.PendingForwardInfo?
-) -> Signal<StoryUploadResult, NoError> {
+) -> Signal<PendingStoryUploadResult, NoError> {
     return postbox.transaction { transaction -> (Peer, Peer?)? in
         if let peer = transaction.getPeer(toPeerId) {
             if let forwardInfo = forwardInfo {
@@ -1282,7 +1340,7 @@ func _internal_uploadStoryImpl(
         }
         return nil
     }
-    |> mapToSignal { inputPeerAndForwardInfoPeer -> Signal<StoryUploadResult, NoError> in
+    |> mapToSignal { inputPeerAndForwardInfoPeer -> Signal<PendingStoryUploadResult, NoError> in
         guard let (inputPeer, forwardInfoPeer) = inputPeerAndForwardInfoPeer, let inputPeer = apiInputPeer(inputPeer) else {
             return .single(.completed(nil))
         }
@@ -1295,12 +1353,19 @@ func _internal_uploadStoryImpl(
         let passFetchProgress = media is TelegramMediaFile
         let (contentSignal, originalMedia) = uploadedStoryContent(postbox: postbox, network: network, media: media, mediaReference: mediaReference, embeddedStickers: embeddedStickers, accountPeerId: accountPeerId, messageMediaPreuploadManager: messageMediaPreuploadManager, revalidationContext: revalidationContext, auxiliaryMethods: auxiliaryMethods, passFetchProgress: passFetchProgress)
         return contentSignal
-        |> mapToSignal { result -> Signal<StoryUploadResult, NoError> in
+        |> mapToSignal { result -> Signal<PendingStoryUploadResult, NoError> in
             switch result {
             case let .progress(progress):
-                return .single(.progress(progress.progress))
+                let phase: PendingStoryUploadInternalPhase
+                switch progress.phase {
+                case .processing:
+                    phase = .processing
+                case .uploading:
+                    phase = .uploading
+                }
+                return .single(.progress(progress.progress, phase))
             case let .content(content):
-                return postbox.transaction { transaction -> Signal<StoryUploadResult, NoError> in
+                return postbox.transaction { transaction -> Signal<PendingStoryUploadResult, NoError> in
                     let privacyRules = apiInputPrivacyRules(privacy: privacy, transaction: transaction)
                     switch content.content {
                     case let .media(inputMedia, _):
@@ -1356,6 +1421,12 @@ func _internal_uploadStoryImpl(
                             flags |= 1 << 8
                         }
                         
+                        var apiMusic: Api.InputDocument?
+                        if let resource = music?.resource as? CloudDocumentMediaResource, let fileReference = resource.fileReference {
+                            flags |= 1 << 9
+                            apiMusic = .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: fileReference)))
+                        }
+                        
                         return network.request(Api.functions.stories.sendStory(
                             flags: flags,
                             peer: inputPeer,
@@ -1368,14 +1439,15 @@ func _internal_uploadStoryImpl(
                             period: Int32(period),
                             fwdFromId: fwdFromId,
                             fwdFromStory: fwdFromStory,
-                            albums: folders.isEmpty ? nil : folders.map(Int32.init(clamping:))
+                            albums: folders.isEmpty ? nil : folders.map(Int32.init(clamping:)),
+                            music: apiMusic
                         ))
                         |> map(Optional.init)
                         |> `catch` { _ -> Signal<Api.Updates?, NoError> in
                             return .single(nil)
                         }
-                        |> mapToSignal { updates -> Signal<StoryUploadResult, NoError> in
-                            return postbox.transaction { transaction -> StoryUploadResult in
+                        |> mapToSignal { updates -> Signal<PendingStoryUploadResult, NoError> in
+                            return postbox.transaction { transaction -> PendingStoryUploadResult in
                                 var currentState: Stories.LocalState
                                 if let value = transaction.getLocalStoryState()?.get(Stories.LocalState.self) {
                                     currentState = value
@@ -1421,6 +1493,7 @@ func _internal_uploadStoryImpl(
                                                             isMy: item.isMy,
                                                             myReaction: item.myReaction,
                                                             forwardInfo: item.forwardInfo,
+                                                            music: item.music,
                                                             authorId: fromId?.peerId,
                                                             folderIds: item.folderIds
                                                         )
@@ -1491,14 +1564,14 @@ func _internal_uploadBotPreviewImpl(
     entities: [MessageTextEntity],
     embeddedStickers: [TelegramMediaFile],
     randomId: Int64
-) -> Signal<StoryUploadResult, NoError> {
+) -> Signal<PendingStoryUploadResult, NoError> {
     return postbox.transaction { transaction -> Api.InputUser? in
         if let peer = transaction.getPeer(toPeerId) {
             return apiInputUser(peer)
         }
         return nil
     }
-    |> mapToSignal { inputUser -> Signal<StoryUploadResult, NoError> in
+    |> mapToSignal { inputUser -> Signal<PendingStoryUploadResult, NoError> in
         guard let inputUser else {
             return .single(.completed(nil))
         }
@@ -1506,12 +1579,19 @@ func _internal_uploadBotPreviewImpl(
         let passFetchProgress = media is TelegramMediaFile
         let (contentSignal, originalMedia) = uploadedStoryContent(postbox: postbox, network: network, media: media, mediaReference: nil, embeddedStickers: embeddedStickers, accountPeerId: accountPeerId, messageMediaPreuploadManager: messageMediaPreuploadManager, revalidationContext: revalidationContext, auxiliaryMethods: auxiliaryMethods, passFetchProgress: passFetchProgress)
         return contentSignal
-        |> mapToSignal { result -> Signal<StoryUploadResult, NoError> in
+        |> mapToSignal { result -> Signal<PendingStoryUploadResult, NoError> in
             switch result {
             case let .progress(progress):
-                return .single(.progress(progress.progress))
+                let phase: PendingStoryUploadInternalPhase
+                switch progress.phase {
+                case .processing:
+                    phase = .processing
+                case .uploading:
+                    phase = .uploading
+                }
+                return .single(.progress(progress.progress, phase))
             case let .content(content):
-                return postbox.transaction { transaction -> Signal<StoryUploadResult, NoError> in
+                return postbox.transaction { transaction -> Signal<PendingStoryUploadResult, NoError> in
                     switch content.content {
                     case let .media(inputMedia, _):
                         return network.request(Api.functions.bots.addPreviewMedia(bot: inputUser, langCode: language ?? "", media: inputMedia))
@@ -1519,14 +1599,14 @@ func _internal_uploadBotPreviewImpl(
                         |> `catch` { _ -> Signal<Api.BotPreviewMedia?, NoError> in
                             return .single(nil)
                         }
-                        |> mapToSignal { resultPreviewMedia -> Signal<StoryUploadResult, NoError> in
+                        |> mapToSignal { resultPreviewMedia -> Signal<PendingStoryUploadResult, NoError> in
                             guard let resultPreviewMedia else {
                                 return .single(.completed(nil))
                             }
                             switch resultPreviewMedia {
                             case let .botPreviewMedia(botPreviewMediaData):
                                 let (date, resultMedia) = (botPreviewMediaData.date, botPreviewMediaData.media)
-                                return postbox.transaction { transaction -> StoryUploadResult in
+                                return postbox.transaction { transaction -> PendingStoryUploadResult in
                                     var currentState: Stories.LocalState
                                     if let value = transaction.getLocalStoryState()?.get(Stories.LocalState.self) {
                                         currentState = value
@@ -1595,8 +1675,8 @@ func _internal_deleteBotPreviews(account: Account, peerId: PeerId, language: Str
         var inputMedia: [Api.InputMedia] = []
         for item in media {
             if let image = item as? TelegramMediaImage, let resource = image.representations.last?.resource as? CloudPhotoSizeMediaResource {
-                inputMedia.append(.inputMediaPhoto(.init(flags: 0, id: .inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil)))
-                inputMedia.append(Api.InputMedia.inputMediaPhoto(.init(flags: 0, id: Api.InputPhoto.inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil)))
+                inputMedia.append(.inputMediaPhoto(.init(flags: 0, id: .inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil, video: nil)))
+                inputMedia.append(Api.InputMedia.inputMediaPhoto(.init(flags: 0, id: Api.InputPhoto.inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil, video: nil)))
             } else if let file = item as? TelegramMediaFile, let resource = file.resource as? CloudDocumentMediaResource {
                 inputMedia.append(.inputMediaDocument(.init(flags: 0, id: .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference ?? Data()))), videoCover: nil, videoTimestamp: nil, ttlSeconds: nil, query: nil)))
             }
@@ -1653,8 +1733,8 @@ func _internal_deleteBotPreviewsLanguage(account: Account, peerId: PeerId, langu
         var inputMedia: [Api.InputMedia] = []
         for item in media {
             if let image = item as? TelegramMediaImage, let resource = image.representations.last?.resource as? CloudPhotoSizeMediaResource {
-                inputMedia.append(.inputMediaPhoto(.init(flags: 0, id: .inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil)))
-                inputMedia.append(Api.InputMedia.inputMediaPhoto(.init(flags: 0, id: Api.InputPhoto.inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil)))
+                inputMedia.append(.inputMediaPhoto(.init(flags: 0, id: .inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil, video: nil)))
+                inputMedia.append(Api.InputMedia.inputMediaPhoto(.init(flags: 0, id: Api.InputPhoto.inputPhoto(.init(id: resource.photoId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), ttlSeconds: nil, video: nil)))
             } else if let file = item as? TelegramMediaFile, let resource = file.resource as? CloudDocumentMediaResource {
                 inputMedia.append(.inputMediaDocument(.init(flags: 0, id: .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference ?? Data()))), videoCover: nil, videoTimestamp: nil, ttlSeconds: nil, query: nil)))
             }
@@ -1774,7 +1854,8 @@ func _internal_editStory(account: Account, peerId: PeerId, id: Int32, media: Eng
                 mediaAreas: inputMediaAreas,
                 caption: apiCaption,
                 entities: apiEntities,
-                privacyRules: privacyRules
+                privacyRules: privacyRules,
+                music: nil
             ))
             |> map(Optional.init)
             |> `catch` { _ -> Signal<Api.Updates?, NoError> in
@@ -1833,6 +1914,7 @@ func _internal_editStoryPrivacy(account: Account, id: Int32, privacy: EngineStor
                 isMy: item.isMy,
                 myReaction: item.myReaction,
                 forwardInfo: item.forwardInfo,
+                music: item.music,
                 authorId: item.authorId,
                 folderIds: item.folderIds
             )
@@ -1866,6 +1948,7 @@ func _internal_editStoryPrivacy(account: Account, id: Int32, privacy: EngineStor
                 isMy: item.isMy,
                 myReaction: item.myReaction,
                 forwardInfo: item.forwardInfo,
+                music: item.music,
                 authorId: item.authorId,
                 folderIds: item.folderIds
             )
@@ -1883,7 +1966,7 @@ func _internal_editStoryPrivacy(account: Account, id: Int32, privacy: EngineStor
         var flags: Int32 = 0
         flags |= 1 << 2
         
-        return account.network.request(Api.functions.stories.editStory(flags: flags, peer: .inputPeerSelf, id: id, media: nil, mediaAreas: nil, caption: nil, entities: nil, privacyRules: inputRules))
+        return account.network.request(Api.functions.stories.editStory(flags: flags, peer: .inputPeerSelf, id: id, media: nil, mediaAreas: nil, caption: nil, entities: nil, privacyRules: inputRules, music: nil))
         |> map(Optional.init)
         |> `catch` { _ -> Signal<Api.Updates?, NoError> in
             return .single(nil)
@@ -2064,6 +2147,7 @@ func _internal_updateStoriesArePinned(account: Account, peerId: PeerId, ids: [In
                     isMy: item.isMy,
                     myReaction: item.myReaction,
                     forwardInfo: item.forwardInfo,
+                    music: item.music,
                     authorId: item.authorId,
                     folderIds: item.folderIds
                 )
@@ -2096,6 +2180,7 @@ func _internal_updateStoriesArePinned(account: Account, peerId: PeerId, ids: [In
                     isMy: item.isMy,
                     myReaction: item.myReaction,
                     forwardInfo: item.forwardInfo,
+                    music: item.music,
                     authorId: item.authorId,
                     folderIds: item.folderIds
                 )
@@ -2223,7 +2308,7 @@ extension Stories.StoredItem {
     init?(apiStoryItem: Api.StoryItem, existingItem: Stories.Item? = nil, peerId: PeerId, transaction: Transaction) {
         switch apiStoryItem {
         case let .storyItem(storyItemData):
-            let (flags, id, date, fromId, forwardFrom, expireDate, caption, entities, media, mediaAreas, privacy, views, sentReaction, albums) = (storyItemData.flags, storyItemData.id, storyItemData.date, storyItemData.fromId, storyItemData.fwdFrom, storyItemData.expireDate, storyItemData.caption, storyItemData.entities, storyItemData.media, storyItemData.mediaAreas, storyItemData.privacy, storyItemData.views, storyItemData.sentReaction, storyItemData.albums)
+            let (flags, id, date, fromId, forwardFrom, expireDate, caption, entities, media, mediaAreas, privacy, views, sentReaction, albums, music) = (storyItemData.flags, storyItemData.id, storyItemData.date, storyItemData.fromId, storyItemData.fwdFrom, storyItemData.expireDate, storyItemData.caption, storyItemData.entities, storyItemData.media, storyItemData.mediaAreas, storyItemData.privacy, storyItemData.views, storyItemData.sentReaction, storyItemData.albums, storyItemData.music)
             var folderIds: [Int64]?
             if let albums {
                 folderIds = albums.map(Int64.init)
@@ -2322,6 +2407,12 @@ extension Stories.StoredItem {
                     break
                 }
                 
+                
+                var parsedMusic: TelegramMediaFile?
+                if let music {
+                    parsedMusic = telegramMediaFileFromApiDocument(music, altDocuments: nil)
+                }
+                
                 let item = Stories.Item(
                     id: id,
                     timestamp: date,
@@ -2344,6 +2435,7 @@ extension Stories.StoredItem {
                     isMy: mergedIsMy,
                     myReaction: mergedMyReaction,
                     forwardInfo: mergedForwardInfo,
+                    music: parsedMusic,
                     authorId: fromId?.peerId,
                     folderIds: folderIds
                 )
@@ -2425,6 +2517,7 @@ func _internal_getStoryById(accountPeerId: PeerId, postbox: Postbox, network: Ne
                                 isMy: item.isMy,
                                 myReaction: item.myReaction,
                                 forwardInfo: item.forwardInfo.flatMap { EngineStoryItem.ForwardInfo($0, transaction: transaction) },
+                                music: item.music.flatMap(EngineMedia.init),
                                 author: item.authorId.flatMap { transaction.getPeer($0).flatMap(EnginePeer.init) },
                                 folderIds: item.folderIds
                             )
@@ -2925,6 +3018,7 @@ func _internal_setStoryReaction(account: Account, peerId: EnginePeer.Id, id: Int
                         isMy: item.isMy,
                         myReaction: reaction,
                         forwardInfo: item.forwardInfo,
+                        music: item.music,
                         authorId: item.authorId,
                         folderIds: item.folderIds
                     ))
@@ -2960,6 +3054,7 @@ func _internal_setStoryReaction(account: Account, peerId: EnginePeer.Id, id: Int
                 isMy: item.isMy,
                 myReaction: reaction,
                 forwardInfo: item.forwardInfo,
+                music: item.music,
                 authorId: item.authorId,
                 folderIds: item.folderIds
             ))
@@ -3037,6 +3132,7 @@ func _internal_sendStoryStars(account: Account, peerId: EnginePeer.Id, id: Int32
                         isMy: item.isMy,
                         myReaction: .stars,
                         forwardInfo: item.forwardInfo,
+                        music: item.music,
                         authorId: item.authorId,
                         folderIds: item.folderIds
                     ))
@@ -3072,6 +3168,7 @@ func _internal_sendStoryStars(account: Account, peerId: EnginePeer.Id, id: Int32
                 isMy: item.isMy,
                 myReaction: .stars,
                 forwardInfo: item.forwardInfo,
+                music: item.music,
                 authorId: item.authorId,
                 folderIds: item.folderIds
             ))

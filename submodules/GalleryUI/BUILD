@@ -54,6 +54,7 @@ swift_library(
         "//submodules/TooltipUI",
         "//submodules/TelegramNotices",
         "//submodules/Pasteboard",
+        "//submodules/TelegramUI/Components/Chat/ChatRichTextEditorComposer",
         "//submodules/AdUI",
         "//submodules/TelegramUI/Components/Ads/AdsInfoScreen",
         "//submodules/TelegramUI/Components/Ads/AdsReportScreen",
@@ -78,6 +79,7 @@ swift_library(
         "//submodules/TelegramUI/Components/GlassBackgroundComponent",
         "//submodules/TelegramUI/Components/GlassControls",
         "//submodules/TelegramUI/Components/VideoPlaybackControlsComponent",
+        "//submodules/UIKitRuntimeUtils",
     ],
     visibility = [
         "//visibility:public",

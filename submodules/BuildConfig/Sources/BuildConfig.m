@@ -1,9 +1,5 @@
 #import <BuildConfig/BuildConfig.h>
 
-#ifndef APP_SG_CONFIG
-#define APP_SG_CONFIG ""
-#endif
-
 static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v3";
 API_AVAILABLE(ios(10))
 @interface LocalPrivateKey : NSObject {

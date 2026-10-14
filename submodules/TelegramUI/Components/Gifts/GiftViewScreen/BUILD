@@ -5,8 +5,6 @@ swift_library(
     module_name = "GiftViewScreen",
     srcs = glob([
         "Sources/**/*.swift",
-    ], exclude = [
-        "Sources/TableComponent.swift",
     ]),
     copts = [
         "-warnings-as-errors",
@@ -14,7 +12,6 @@ swift_library(
     deps = [
         "//submodules/AsyncDisplayKit",
         "//submodules/Display",
-        "//submodules/Postbox",
         "//submodules/TelegramCore",
         "//submodules/SSignalKit/SwiftSignalKit",
         "//submodules/TelegramPresentationData",
@@ -72,6 +69,8 @@ swift_library(
         "//submodules/TelegramUI/Components/AlertComponent/AlertTransferHeaderComponent",
         "//submodules/TelegramUI/Components/AlertComponent/AlertTableComponent",
         "//submodules/TelegramUI/Components/AlertComponent/AlertInputFieldComponent",
+        "//submodules/TelegramUI/Components/GlassControls",
+        "//submodules/Components/ResizableSheetComponent",
     ],
     visibility = [
         "//visibility:public",

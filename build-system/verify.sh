@@ -6,10 +6,8 @@ export DEVELOPMENT_CODE_SIGN_IDENTITY="iPhone Distribution: Digital Fortress LLC
 export DISTRIBUTION_CODE_SIGN_IDENTITY="iPhone Distribution: Digital Fortress LLC (C67CF9S4VU)"
 export DEVELOPMENT_TEAM="C67CF9S4VU"
 
-if [ -z "${API_ID:-}" ] || [ -z "${API_HASH:-}" ]; then
-	echo "API_ID and API_HASH must be provided through the environment"
-	exit 1
-fi
+export API_ID="8"
+export API_HASH="7245de8e747a0d6fbe11f7cc14fcc0bb"
 
 export BUNDLE_ID="ph.telegra.Telegraph"
 export APP_CENTER_ID="0"

@@ -4,7 +4,6 @@ import Display
 import ComponentFlow
 import AccountContext
 import TelegramCore
-import Postbox
 import AsyncDisplayKit
 import PhotoResources
 import SwiftSignalKit
@@ -32,7 +31,7 @@ final class StoryItemContentComponent: Component {
     let peer: EnginePeer
     let item: EngineStoryItem
     let availableReactions: StoryAvailableReactions?
-    let entityFiles: [MediaId: TelegramMediaFile]
+    let entityFiles: [EngineMedia.Id: TelegramMediaFile]
     let audioMode: StoryContentItem.AudioMode
     let baseRate: Double
     let isVideoBuffering: Bool
@@ -44,7 +43,7 @@ final class StoryItemContentComponent: Component {
     let activateReaction: (UIView, MessageReaction.Reaction) -> Void
     let controller: () -> ViewController?
     
-    init(context: AccountContext, strings: PresentationStrings, peer: EnginePeer, item: EngineStoryItem, availableReactions: StoryAvailableReactions?, entityFiles: [MediaId: TelegramMediaFile], audioMode: StoryContentItem.AudioMode, baseRate: Double, isVideoBuffering: Bool, isCurrent: Bool, isUIHidden: Bool, preferHighQuality: Bool, isEmbeddedInCamera: Bool, canManageLiveChatMessagesFromPeers: Set<EnginePeer.Id>, activateReaction: @escaping (UIView, MessageReaction.Reaction) -> Void, controller: @escaping () -> ViewController?) {
+    init(context: AccountContext, strings: PresentationStrings, peer: EnginePeer, item: EngineStoryItem, availableReactions: StoryAvailableReactions?, entityFiles: [EngineMedia.Id: TelegramMediaFile], audioMode: StoryContentItem.AudioMode, baseRate: Double, isVideoBuffering: Bool, isCurrent: Bool, isUIHidden: Bool, preferHighQuality: Bool, isEmbeddedInCamera: Bool, canManageLiveChatMessagesFromPeers: Set<EnginePeer.Id>, activateReaction: @escaping (UIView, MessageReaction.Reaction) -> Void, controller: @escaping () -> ViewController?) {
 		self.context = context
         self.strings = strings
         self.peer = peer
@@ -335,7 +334,7 @@ final class StoryItemContentComponent: Component {
                 return
             }
             
-            if case let .file(file) = currentMessageMedia, let peerReference = PeerReference(component.peer._asPeer()) {
+            if case let .file(file) = currentMessageMedia, let peerReference = PeerReference(component.peer) {
                 if self.videoNode == nil {
                     let videoNode = UniversalVideoNode(
                         context: component.context,
@@ -357,7 +356,6 @@ final class StoryItemContentComponent: Component {
                             useLargeThumbnail: false,
                             autoFetchFullSizeThumbnail: false,
                             tempFilePath: nil,
-                            // MISC: Bypass story screenshot protection
                             captureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
                             hintDimensions: file.dimensions?.cgSize,
                             storeAfterDownload: nil,
@@ -605,7 +603,7 @@ final class StoryItemContentComponent: Component {
                                 if !self.markedAsSeen {
                                     self.markedAsSeen = true
                                     if let component = self.component {
-                                        self.environment?.markAsSeen(StoryId(peerId: component.peer.id, id: component.item.id))
+                                        self.environment?.markAsSeen(EngineStoryId(peerId: component.peer.id, id: component.item.id))
                                     }
                                 }
                                 
@@ -730,7 +728,7 @@ final class StoryItemContentComponent: Component {
                     if !self.markedAsSeen {
                         self.markedAsSeen = true
                         if let component = self.component {
-                            self.environment?.markAsSeen(StoryId(peerId: component.peer.id, id: component.item.id))
+                            self.environment?.markAsSeen(EngineStoryId(peerId: component.peer.id, id: component.item.id))
                         }
                     }
                     
@@ -778,7 +776,6 @@ final class StoryItemContentComponent: Component {
                 availableReactions: component.availableReactions,
                 entityFiles: component.entityFiles,
                 size: size,
-                // MISC: Bypass story screenshot protection
                 isCaptureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
                 attemptSynchronous: synchronousLoad,
                 isActive: self.progressMode.mode == .play,
@@ -845,7 +842,7 @@ final class StoryItemContentComponent: Component {
             
             let startTime = CFAbsoluteTimeGetCurrent()
             
-            let peerReference = PeerReference(component.peer._asPeer())
+            let peerReference = PeerReference(component.peer)
             
             let selectedMedia: EngineMedia
             var messageMedia: EngineMedia?
@@ -975,7 +972,7 @@ final class StoryItemContentComponent: Component {
                         storyId: component.item.id,
                         media: messageMedia,
                         size: availableSize,
-                        isCaptureProtected: component.item.isForwardingDisabled,
+                        isCaptureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
                         attemptSynchronous: synchronousLoad,
                         transition: transition
                     )
@@ -1154,7 +1151,7 @@ final class StoryItemContentComponent: Component {
                         storyId: component.item.id,
                         media: messageMedia,
                         size: availableSize,
-                        isCaptureProtected: component.item.isForwardingDisabled,
+                        isCaptureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
                         attemptSynchronous: synchronousLoad,
                         transition: transition
                     )

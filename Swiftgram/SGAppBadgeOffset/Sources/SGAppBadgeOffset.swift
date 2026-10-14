@@ -30,7 +30,12 @@ let DEVICE_MODELS_WITH_APP_BADGE_SUPPORT: [DeviceModel] = [
     .iPhone16Plus,
     .iPhone16Pro,
     .iPhone16ProMax,
-    .iPhone16e
+    .iPhone16e,
+    .iPhone17,
+    .iPhone17Pro,
+    .iPhone17ProMax,
+    .iPhoneAir/*,
+    .iPhone17e*/
 ]
 
 extension DeviceMetrics {
@@ -47,7 +52,7 @@ extension DeviceMetrics {
                 defaultOffset = 6.0
             case .iPhone11ProMax, .iPhoneXSMax:
                 defaultOffset = 4.0
-            case .iPhone12, .iPhone12Pro, .iPhone13, .iPhone13Pro, .iPhone14, .iPhone16e:
+            case .iPhone12, .iPhone12Pro, .iPhone13, .iPhone13Pro, .iPhone14, .iPhone16e/*, .iPhone17e*/:
                 defaultOffset = 4.0
             case .iPhone12ProMax, .iPhone13ProMax, .iPhone14Plus:
                 defaultOffset = 6.0
@@ -55,9 +60,9 @@ extension DeviceMetrics {
                 defaultOffset = 18.0
             case .iPhone14ProMax, .iPhone15Plus, .iPhone15ProMax, .iPhone16Plus:
                 defaultOffset = 19.0
-            case .iPhone16Pro:
+            case .iPhone16Pro, .iPhone17, .iPhone17Pro:
                 defaultOffset = 21.0
-            case .iPhone16ProMax:
+            case .iPhone16ProMax, .iPhone17ProMax, .iPhoneAir:
                 defaultOffset = 22.0
             default:
                 defaultOffset = 0.0 // Any device in 2025+ should be like iPhone 14 Pro or better

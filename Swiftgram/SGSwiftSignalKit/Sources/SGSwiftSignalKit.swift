@@ -1,5 +1,4 @@
 import Foundation
-import SwiftSignalKit
 
 public func transformValue<T, E, R>(_ f: @escaping(T) -> R) -> (Signal<T, E>) -> Signal<R, E> {
     return map(f)

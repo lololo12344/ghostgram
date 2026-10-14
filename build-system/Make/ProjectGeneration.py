@@ -26,22 +26,22 @@ def generate_xcodeproj(build_environment: BuildEnvironment, disable_extensions, 
     if target_name == 'Telegram':
         if disable_extensions:
             bazel_generate_arguments += ['--//{}:disableExtensions'.format(app_target)]
-        if disable_provisioning_profiles:
-            bazel_generate_arguments += ['--//{}:disableProvisioningProfiles'.format(app_target)]
         bazel_generate_arguments += ['--//{}:disableStripping'.format(app_target)]
 
     project_bazel_arguments = []
     for argument in bazel_app_arguments:
         project_bazel_arguments.append(argument)
 
+    if target_name == "Swiftgram/Playground":
+        project_bazel_arguments += ["--swiftcopt=-no-warnings-as-errors", "--copt=-Wno-error"]#, "--swiftcopt=-DSWIFTGRAM_PLAYGROUND", "--copt=-DSWIFTGRAM_PLAYGROUND=1"]
+
     if target_name == 'Telegram':
         if disable_extensions:
             project_bazel_arguments += ['--//{}:disableExtensions'.format(app_target)]
-        if disable_provisioning_profiles:
-            project_bazel_arguments += ['--//{}:disableProvisioningProfiles'.format(app_target)]
         project_bazel_arguments += ['--//{}:disableStripping'.format(app_target)]
 
     project_bazel_arguments += ['--features=-swift.debug_prefix_map']
+    project_bazel_arguments += ['--features=swift.emit_swiftsourceinfo']
     
     xcodeproj_bazelrc = os.path.join(build_environment.base_path, 'xcodeproj.bazelrc')
     if os.path.isfile(xcodeproj_bazelrc):
@@ -51,7 +51,8 @@ def generate_xcodeproj(build_environment: BuildEnvironment, disable_extensions, 
             file.write('build ' + argument + '\n')
 
     call_executable(bazel_generate_arguments)
-
+    if app_target_spec == "Telegram:Telegram": # MARK: Swiftgram
+        app_target_spec = "Telegram/Swiftgram"
     xcodeproj_path = '{}.xcodeproj'.format(app_target_spec.replace(':', '/'))
     return xcodeproj_path
 

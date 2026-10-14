@@ -141,24 +141,28 @@ public func sgProController(context: AccountContext) -> ViewController {
                 if #available(iOS 14.0, *) {
                     pushControllerImpl?(sgAppBadgeSettingsController(context: context, presentationData: presentationData))
                 } else {
-                    presentControllerImpl?(UndoOverlayController(
-                        presentationData: presentationData,
-                        content: .info(title: nil, text: "iOS 14 or newer is required for this feature.", timeout: nil, customUndoText: nil),
-                        elevatedLayout: false,
-                        action: { _ in return false }
-                    ), nil)
+                    presentControllerImpl?(context.sharedContext.makeSGUpdateIOSController(), nil)
                 }
         }
     }, action: { action in
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         switch action {
             case .resetIAP:
-                presentControllerImpl?(UndoOverlayController(
-                    presentationData: presentationData,
-                    content: .info(title: nil, text: "Reset is unavailable in this build.", timeout: nil, customUndoText: nil),
-                    elevatedLayout: false,
-                    action: { _ in return false }
-                ), nil)
+                let updateSettingsSignal = updateSGStatusInteractively(accountManager: context.sharedContext.accountManager, { status in
+                    var status = status
+                    status.status = SGStatus.default.status
+                    SGSimpleSettings.shared.primaryUserId = ""
+                    return status
+                })
+                let _ = (updateSettingsSignal |> deliverOnMainQueue).start(next: {
+                    presentControllerImpl?(UndoOverlayController(
+                        presentationData: presentationData,
+                        content: .info(title: nil, text: "Status reset completed. You can now restore purchases.", timeout: nil, customUndoText: nil),
+                        elevatedLayout: false,
+                        action: { _ in return false }
+                    ),
+                    nil)
+                })
         }
     })
     
@@ -186,4 +190,5 @@ public func sgProController(context: AccountContext) -> ViewController {
     
     return controller
 }
+
 

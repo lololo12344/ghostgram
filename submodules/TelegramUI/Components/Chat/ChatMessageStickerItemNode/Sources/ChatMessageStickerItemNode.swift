@@ -3,7 +3,6 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TextFormat
@@ -38,7 +37,6 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
     public let contextSourceNode: ContextExtractedContentContainingNode
     private let containerNode: ContextControllerSourceNode
     public let imageNode: TransformImageNode
-    public var sizeCoefficient: Float = 1.0
     private var backgroundNode: WallpaperBubbleBackgroundNode?
     private var placeholderNode: StickerShimmerEffectNode
     public var textNode: TextNode?
@@ -54,6 +52,8 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
     private let fetchDisposable = MetaDisposable()
     
     private var suggestedPostInfoNode: ChatMessageSuggestedPostInfoNode?
+    // MARK: Swiftgram
+    public var sizeCoefficient: Float = 1.0
     
     private var viaBotNode: TextNode?
     public let dateAndStatusNode: ChatMessageDateAndStatusNode
@@ -76,7 +76,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
     private var replyRecognizer: ChatSwipeToReplyRecognizer?
     private var currentSwipeAction: ChatControllerInteractionSwipeAction?
     
-    private var appliedForwardInfo: (Peer?, String?)?
+    private var appliedForwardInfo: (EngineRawPeer?, String?)?
 
     private var enableSynchronousImageApply: Bool = false
     
@@ -230,7 +230,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     }
                 }
                 
-                if let item = strongSelf.item, item.presentationData.largeEmoji && messageIsEligibleForLargeEmoji(item.message) {
+                if let item = strongSelf.item, item.presentationData.largeEmoji && messageIsEligibleForLargeEmoji(EngineMessage(item.message)) {
                     if strongSelf.imageNode.frame.contains(point) {
                         return .waitForDoubleTap
                     }
@@ -422,7 +422,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
     }
     
     override public func asyncLayout() -> (_ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: ChatMessageHeaderSpec) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
-        let displaySize = CGSize(width: 184.0, height: 184.0)
+        let displaySize = CGSize(width: 184.0 * CGFloat(self.sizeCoefficient), height: 184.0 * CGFloat(self.sizeCoefficient))
         let telegramFile = self.telegramFile
         let layoutConstants = self.layoutConstants
         let imageLayout = self.imageNode.asyncLayout()
@@ -457,7 +457,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
             
             var textLayoutAndApply: (TextNodeLayout, () -> TextNode)?
             var isEmoji = false
-            if item.presentationData.largeEmoji && messageIsEligibleForLargeEmoji(item.message) {
+            if item.presentationData.largeEmoji && messageIsEligibleForLargeEmoji(EngineMessage(item.message)) {
                 let attributedText = NSAttributedString(string: item.message.text, font: item.presentationData.messageEmojiFont, textColor: .black)
                 textLayoutAndApply = textLayout(TextNodeLayoutArguments(attributedString: attributedText, backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: params.width, height: 90.0), alignment: .natural))
                 
@@ -644,7 +644,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
             } else {
                 dateFormat = .regular
             }
-            let dateText = stringForMessageTimestampStatus(accountPeerId: item.context.account.peerId, message: item.message, dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: dateFormat, associatedData: item.associatedData)
+            let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: dateFormat, associatedData: item.associatedData)
             
             var isReplyThread = false
             if case .replyThread = item.chatLocation {
@@ -655,11 +655,10 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                 context: item.context,
                 presentationData: item.presentationData,
                 edited: edited,
-                isDeleted: item.message.ghostgramIsDeleted,
                 impressionCount: viewCount,
                 dateText: dateText,
                 type: statusType,
-                layoutInput: .standalone(reactionSettings: shouldDisplayInlineDateReactions(message: item.message, isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.StandaloneReactionSettings() : nil),
+                layoutInput: .standalone(reactionSettings: shouldDisplayInlineDateReactions(message: EngineMessage(item.message), isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.StandaloneReactionSettings() : nil),
                 constrainedSize: CGSize(width: params.width, height: CGFloat.greatestFiniteMagnitude),
                 availableReactions: item.associatedData.availableReactions,
                 savedMessageTags: item.associatedData.savedMessageTags,
@@ -673,7 +672,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                 starsCount: starsCount,
                 isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
                 hasAutoremove: item.message.isSelfExpiring,
-                canViewReactionList: canViewMessageReactionList(message: item.message),
+                canViewReactionList: canViewMessageReactionList(message: EngineMessage(item.message)),
                 animationCache: item.controllerInteraction.presentationContext.animationCache,
                 animationRenderer: item.controllerInteraction.presentationContext.animationRenderer
             ))
@@ -705,11 +704,11 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                 }
             }
             
-            var replyMessage: Message?
+            var replyMessage: EngineRawMessage?
             var replyForward: QuotedReplyMessageAttribute?
             var replyQuote: (quote: EngineMessageReplyQuote, isQuote: Bool)?
-            var replyTodoItemId: Int32?
-            var replyStory: StoryId?
+            var replyInnerSubject: EngineMessageReplyInnerSubject?
+            var replyStory: EngineStoryId?
             for attribute in item.message.attributes {
                 if let attribute = attribute as? InlineBotMessageAttribute {
                     var inlineBotNameString: String?
@@ -737,7 +736,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                         replyMessage = item.message.associatedMessages[replyAttribute.messageId]
                     }
                     replyQuote = replyAttribute.quote.flatMap { ($0, replyAttribute.isQuote) }
-                    replyTodoItemId = replyAttribute.todoItemId
+                    replyInnerSubject = replyAttribute.innerSubject
                 } else if let attribute = attribute as? QuotedReplyMessageAttribute {
                     replyForward = attribute
                 } else if let attribute = attribute as? ReplyStoryAttribute {
@@ -777,7 +776,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     message: replyMessage,
                     replyForward: replyForward,
                     quote: replyQuote,
-                    todoItemId: replyTodoItemId,
+                    innerSubject: replyInnerSubject,
                     story: replyStory,
                     isSummarized: false,
                     parentMessage: item.message,
@@ -813,7 +812,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
             
             let contentHeight = max(imageSize.height, layoutConstants.image.minDimensions.height)
             
-            var forwardSource: Peer?
+            var forwardSource: EngineRawPeer?
             var forwardAuthorSignature: String?
             var forwardPsaType: String?
             
@@ -841,7 +840,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     }
                 }
                 let availableForwardWidth = max(60.0, availableWidth + 6.0)
-                forwardInfoSizeApply = makeForwardInfoLayout(item.context, item.presentationData, item.presentationData.strings, .standalone, forwardSource, forwardAuthorSignature, forwardPsaType, nil, CGSize(width: availableForwardWidth, height: CGFloat.greatestFiniteMagnitude))
+                forwardInfoSizeApply = makeForwardInfoLayout(item.context, item.presentationData, item.presentationData.strings, .standalone, forwardSource.flatMap(EnginePeer.init), forwardAuthorSignature, forwardPsaType, nil, CGSize(width: availableForwardWidth, height: CGFloat.greatestFiniteMagnitude))
             }
             
             var needsReplyBackground = false
@@ -859,7 +858,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
             var maxContentWidth = imageSize.width
             var actionButtonsFinalize: ((CGFloat) -> (CGSize, (_ animation: ListViewItemUpdateAnimation) -> ChatMessageActionButtonsNode))?
             if let replyMarkup = replyMarkup {
-                let (minWidth, buttonsLayout) = actionButtonsLayout(item.context, item.presentationData.theme, item.presentationData.chatBubbleCorners, item.presentationData.strings, item.controllerInteraction.presentationContext.backgroundNode, replyMarkup, [:], item.message, baseWidth)
+                let (minWidth, buttonsLayout) = actionButtonsLayout(item.context, item.presentationData.theme, item.presentationData.chatBubbleCorners, item.presentationData.strings, item.controllerInteraction.presentationContext.backgroundNode, replyMarkup, [:], EngineMessage(item.message), baseWidth)
                 maxContentWidth = max(maxContentWidth, minWidth)
                 actionButtonsFinalize = buttonsLayout
             } else if incoming, let attribute = item.message.attributes.first(where: { $0 is SuggestedPostMessageAttribute }) as? SuggestedPostMessageAttribute, attribute.state == nil {
@@ -869,13 +868,13 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                 }
                 
                 var buttonDeclineValue: UInt8 = 0
-                let buttonDecline = MemoryBuffer(data: Data(bytes: &buttonDeclineValue, count: 1))
+                let buttonDecline = EngineMemoryBuffer(data: Data(bytes: &buttonDeclineValue, count: 1))
                 var buttonApproveValue: UInt8 = 1
-                let buttonApprove = MemoryBuffer(data: Data(bytes: &buttonApproveValue, count: 1))
+                let buttonApprove = EngineMemoryBuffer(data: Data(bytes: &buttonApproveValue, count: 1))
                 var buttonSuggestChangesValue: UInt8 = 2
-                let buttonSuggestChanges = MemoryBuffer(data: Data(bytes: &buttonSuggestChangesValue, count: 1))
-                
-                let customInfos: [MemoryBuffer: ChatMessageActionButtonsNode.CustomInfo] = [
+                let buttonSuggestChanges = EngineMemoryBuffer(data: Data(bytes: &buttonSuggestChangesValue, count: 1))
+
+                let customInfos: [EngineMemoryBuffer: ChatMessageActionButtonsNode.CustomInfo] = [
                     buttonDecline: ChatMessageActionButtonsNode.CustomInfo(
                         isEnabled: true,
                         icon: .suggestedPostReject
@@ -899,8 +898,8 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     ReplyMarkupMessageAttribute(
                         rows: [
                             ReplyMarkupRow(buttons: [
-                                ReplyMarkupButton(title: item.presentationData.strings.Chat_PostApproval_Message_ActionReject, titleWhenForwarded: nil, action: .callback(requiresPassword: false, data: buttonDecline), style: nil),
-                                ReplyMarkupButton(title: item.presentationData.strings.Chat_PostApproval_Message_ActionApprove, titleWhenForwarded: nil, action: .callback(requiresPassword: false, data: buttonApprove), style: nil)
+                                ReplyMarkupButton(title: item.presentationData.strings.Chat_PostApproval_Message_ActionReject, titleWhenForwarded: nil, action: .callback(requiresPassword: false, data: buttonDecline), style: ReplyMarkupButton.Style(color: .danger, iconFileId: nil)),
+                                ReplyMarkupButton(title: item.presentationData.strings.Chat_PostApproval_Message_ActionApprove, titleWhenForwarded: nil, action: .callback(requiresPassword: false, data: buttonApprove), style: ReplyMarkupButton.Style(color: .success, iconFileId: nil))
                             ]),
                             ReplyMarkupRow(buttons: [
                                 ReplyMarkupButton(title: item.presentationData.strings.Chat_PostApproval_Message_ActionSuggestChanges, titleWhenForwarded: nil, action: .callback(requiresPassword: false, data: buttonSuggestChanges), style: nil)
@@ -908,7 +907,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                         ],
                         flags: [],
                         placeholder: nil
-                ), customInfos, item.message, baseWidth)
+                ), customInfos, EngineMessage(item.message), baseWidth)
                 maxContentWidth = max(maxContentWidth, minWidth)
                 actionButtonsFinalize = buttonsLayout
             }
@@ -919,7 +918,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
             }
             
             let reactions: ReactionsMessageAttribute
-            if shouldDisplayInlineDateReactions(message: item.message, isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) {
+            if shouldDisplayInlineDateReactions(message: EngineMessage(item.message), isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) {
                 reactions = ReactionsMessageAttribute(canViewList: false, isTags: false, reactions: [], recentPeers: [], topPeers: [])
             } else {
                 reactions = mergedMessageReactions(attributes: item.message.attributes, isTags: item.message.areReactionsTags(accountPeerId: item.context.account.peerId)) ?? ReactionsMessageAttribute(canViewList: false, isTags: false, reactions: [], recentPeers: [], topPeers: [])
@@ -937,7 +936,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     availableReactions: item.associatedData.availableReactions,
                     savedMessageTags: item.associatedData.savedMessageTags,
                     reactions: reactions,
-                    message: item.message,
+                    message: EngineMessage(item.message),
                     associatedData: item.associatedData,
                     accountPeer: item.associatedData.accountPeer,
                     isIncoming: item.message.effectivelyIncoming(item.context.account.peerId),
@@ -1121,7 +1120,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                                 strongSelf?.openQuickShare(node: node, gesture: gesture)
                             }
                         }
-                        let buttonSize = updatedShareButtonNode.update(presentationData: item.presentationData, controllerInteraction: item.controllerInteraction, chatLocation: item.chatLocation, subject: item.associatedData.subject, message: item.message, account: item.context.account)
+                        let buttonSize = updatedShareButtonNode.update(presentationData: item.presentationData, controllerInteraction: item.controllerInteraction, chatLocation: item.chatLocation, subject: item.associatedData.subject, message: EngineMessage(item.message), accountPeerId: item.context.account.peerId)
                         let shareButtonFrame = CGRect(origin: CGPoint(x: baseShareButtonFrame.minX, y: baseShareButtonFrame.maxY - buttonSize.height), size: buttonSize)
                         transition.updateFrame(node: updatedShareButtonNode, frame: shareButtonFrame)
                     } else if let shareButtonNode = strongSelf.shareButtonNode {
@@ -1514,7 +1513,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     case let .optionalAction(f):
                         f()
                     case let .openContextMenu(openContextMenu):
-                        if canAddMessageReactions(message: item.message) {
+                        if canAddMessageReactions(message: EngineMessage(item.message)) {
                             item.controllerInteraction.updateMessageReaction(openContextMenu.tapMessage, .default, false, nil)
                         } else {
                             item.controllerInteraction.openMessageContextMenu(openContextMenu.tapMessage, openContextMenu.selectAll, self, openContextMenu.subFrame, nil, nil)
@@ -1809,7 +1808,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
         
         let incoming = item.content.effectivelyIncoming(item.context.account.peerId, associatedData: item.associatedData)
         var isEmoji = false
-        if let item = self.item, item.presentationData.largeEmoji && messageIsEligibleForLargeEmoji(item.message) {
+        if let item = self.item, item.presentationData.largeEmoji && messageIsEligibleForLargeEmoji(EngineMessage(item.message)) {
             isEmoji = true
         }
 
@@ -2221,7 +2220,7 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
         item.controllerInteraction.openMessageContextMenu(item.message, false, self, self.imageNode.frame, nil, nil)
     }
     
-    override public func targetForStoryTransition(id: StoryId) -> UIView? {
+    override public func targetForStoryTransition(id: EngineStoryId) -> UIView? {
         guard let item = self.item else {
             return nil
         }

@@ -822,6 +822,8 @@ private func decryptedEntities73(_ entities: [MessageTextEntity]?) -> [SecretApi
                 break
             case .CustomEmoji:
                 break
+            case .FormattedDate:
+                break
             case .Custom:
                 break
         }
@@ -874,6 +876,8 @@ private func decryptedEntities101(_ entities: [MessageTextEntity]?) -> [SecretAp
             case .Spoiler:
                 break
             case .CustomEmoji:
+                break
+            case .FormattedDate:
                 break
             case .Custom:
                 break
@@ -928,6 +932,8 @@ private func decryptedEntities144(_ entities: [MessageTextEntity]?) -> [SecretAp
                 result.append(.messageEntitySpoiler(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count)))
             case let .CustomEmoji(_, fileId):
                 result.append(.messageEntityCustomEmoji(offset: Int32(entity.range.lowerBound), length: Int32(entity.range.count), documentId: fileId))
+            case .FormattedDate:
+                break
             case .Custom:
                 break
         }
@@ -1883,7 +1889,7 @@ private func sendStandaloneMessage(auxiliaryMethods: AccountAuxiliaryMethods, po
             
             var attributes = contents.attributes
             if !attributes.contains(where: { $0 is AutoremoveTimeoutMessageAttribute }), let messageAutoremoveTimeout = state.messageAutoremoveTimeout {
-                attributes.append(AutoclearTimeoutMessageAttribute(timeout: messageAutoremoveTimeout, countdownBeginTime: nil))
+                attributes.append(AutoremoveTimeoutMessageAttribute(timeout: messageAutoremoveTimeout, countdownBeginTime: nil))
             }
             
             let message = Message(

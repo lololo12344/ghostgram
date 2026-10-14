@@ -349,16 +349,31 @@ func telegramMediaActionFromApiAction(_ action: Api.MessageAction) -> TelegramMe
             return nil
         }
         return TelegramMediaAction(action: .starGiftPurchaseOfferDeclined(gift: gift, amount: CurrencyAmount(apiAmount: price), hasExpired: (flags & (1 << 0)) != 0))
-    case let .messageActionNewCreatorPending(messageActionNewCreatorPending):
+    case let .messageActionNewCreatorPending(messageActionNewCreatorPendingData):
         return TelegramMediaAction(action: .groupCreatorChange(TelegramMediaActionType.GroupCreatorChange(
             kind: .pending,
-            targetPeerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(messageActionNewCreatorPending.newCreatorId))
+            targetPeerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(messageActionNewCreatorPendingData.newCreatorId))
         )))
-    case let .messageActionChangeCreator(messageActionChangeCreator):
+    case let .messageActionChangeCreator(messageActionChangeCreatorData):
         return TelegramMediaAction(action: .groupCreatorChange(TelegramMediaActionType.GroupCreatorChange(
             kind: .applied,
-            targetPeerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(messageActionChangeCreator.newCreatorId))
+            targetPeerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(messageActionChangeCreatorData.newCreatorId))
         )))
+    case let .messageActionNoForwardsToggle(messageActionNoForwardsToggleData):
+        return TelegramMediaAction(action: .copyProtectionToggle(previousValue: messageActionNoForwardsToggleData.prevValue == .boolTrue, newValue: messageActionNoForwardsToggleData.newValue == .boolTrue))
+    case let .messageActionNoForwardsRequest(messageActionNoForwardsRequestData):
+        return TelegramMediaAction(action: .copyProtectionRequest(hasExpired: (messageActionNoForwardsRequestData.flags & (1 << 0)) != 0, previousValue: messageActionNoForwardsRequestData.prevValue == .boolTrue, newValue: messageActionNoForwardsRequestData.newValue == .boolTrue))
+    case let .messageActionManagedBotCreated(messageActionManagedBotCreatedData):
+        return TelegramMediaAction(action: .managedBotCreated(botId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(messageActionManagedBotCreatedData.botId))))
+    case let .messageActionPollAppendAnswer(messageActionPollAppendAnswerData):
+        return TelegramMediaAction(action: .pollOptionAppended(TelegramMediaPollOption(apiOption: messageActionPollAppendAnswerData.answer)))
+    case let .messageActionPollDeleteAnswer(messageActionPollDeleteAnswerData):
+        return TelegramMediaAction(action: .pollOptionDeleted(TelegramMediaPollOption(apiOption: messageActionPollDeleteAnswerData.answer)))
+    case let .messageActionChangeCommunity(messageActionChangeCommunityData):
+        let communityId = messageActionChangeCommunityData.communityId.flatMap {
+            PeerId(namespace: Namespaces.Peer.CloudChannel, id: PeerId.Id._internalFromInt64Value($0))
+        }
+        return TelegramMediaAction(action: .communityChanged(communityId: communityId))
     }
 }
 

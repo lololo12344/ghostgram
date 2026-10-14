@@ -1,3 +1,9 @@
+submodules/**/.build/*
+swiftgram-scripts
+Swiftgram/Playground/custom_bazel_path.bzl
+Swiftgram/Playground/codesigning
+buildServer.json
+
 fastlane/README.md
 fastlane/report.xml
 fastlane/test_output/*
@@ -76,13 +82,11 @@ Telegram.LSP.json
 spm-files
 xcode-files
 .bsp/**
+.sourcekit-lsp/**
 /.claude/
+**/.claude/settings.local.json
+**/.vscode/launch.json
 /buildbox/*
-
-# Local/private signing materials (keep fake-codesigning tracked)
-/.profiles/
-/codesigning/
-/build-system/real-codesigning/
-/build-system/local-codesigning/
-build-output/
-build-output/
+**/node_modules/
+tools/sim-watcher/dist/
+.mcp.json

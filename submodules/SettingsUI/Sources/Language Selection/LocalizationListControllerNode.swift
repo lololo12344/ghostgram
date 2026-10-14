@@ -1,8 +1,8 @@
+import SGStrings
 import Foundation
 import UIKit
 import Display
 import AsyncDisplayKit
-import Postbox
 import TelegramCore
 import SwiftSignalKit
 import TelegramPresentationData
@@ -10,7 +10,7 @@ import MergeLists
 import ItemListUI
 import PresentationDataUtils
 import AccountContext
-import ShareController
+
 import SearchBarNode
 import SearchUI
 import UndoUI
@@ -95,7 +95,7 @@ private enum LanguageListEntry: Comparable, Identifiable {
             case let .translate(text, value):
                 return ItemListSwitchItem(presentationData: ItemListPresentationData(presentationData), systemStyle: .glass, title: text, value: value, sectionId: LanguageListSection.translate.rawValue, style: .blocks, updated: { value in
                     toggleShowTranslate(value)
-                })
+                }, tag: LocalizationListEntryTag.showButton)
             case let .translateEntire(text, value, locked):
                 return ItemListSwitchItem(presentationData: ItemListPresentationData(presentationData), systemStyle: .glass, title: text, value: value, enableInteractiveChanges: !locked, displayLocked: locked, sectionId: LanguageListSection.translate.rawValue, style: .blocks, updated: { value in
                     if !locked {
@@ -103,7 +103,7 @@ private enum LanguageListEntry: Comparable, Identifiable {
                     }
                 }, activatedWhileDisabled: {
                     showPremiumInfo()
-                })
+                }, tag: LocalizationListEntryTag.translateChats)
             case let .doNotTranslate(text, value):
                 return ItemListDisclosureItem(presentationData: ItemListPresentationData(presentationData), systemStyle: .glass, title: text, label: value, sectionId: LanguageListSection.translate.rawValue, style: .blocks, action: {
                     openDoNotTranslate()
@@ -167,7 +167,7 @@ private final class LocalizationListSearchContainerNode: SearchDisplayController
         self.dimNode = ASDisplayNode()
         self.dimNode.backgroundColor = .clear
         
-        self.listNode = ListView()
+        self.listNode = ListViewImpl()
         self.listNode.accessibilityPageScrolledString = { row, count in
             return presentationData.strings.VoiceOver_ScrollStatus(row, count).string
         }
@@ -342,6 +342,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
     private let requestDeactivateSearch: () -> Void
     private let present: (ViewController, Any?) -> Void
     private let push: (ViewController) -> Void
+    private var focusOnItemTag: LocalizationListEntryTag?
     
     private var didSetReady = false
     let _ready = ValuePromise<Bool>()
@@ -367,7 +368,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
         }
     }
     
-    init(context: AccountContext, presentationData: PresentationData, navigationBar: NavigationBar, requestActivateSearch: @escaping () -> Void, requestDeactivateSearch: @escaping () -> Void, updateCanStartEditing: @escaping (Bool?) -> Void, present: @escaping (ViewController, Any?) -> Void, push: @escaping (ViewController) -> Void) {
+    init(context: AccountContext, presentationData: PresentationData, navigationBar: NavigationBar, requestActivateSearch: @escaping () -> Void, requestDeactivateSearch: @escaping () -> Void, updateCanStartEditing: @escaping (Bool?) -> Void, present: @escaping (ViewController, Any?) -> Void, push: @escaping (ViewController) -> Void, focusOnItemTag: LocalizationListEntryTag?) {
         self.context = context
         self.presentationData = presentationData
         self.presentationDataValue.set(.single(presentationData))
@@ -376,8 +377,9 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
         self.requestDeactivateSearch = requestDeactivateSearch
         self.present = present
         self.push = push
+        self.focusOnItemTag = focusOnItemTag
 
-        self.listNode = ListView()
+        self.listNode = ListViewImpl()
         self.listNode.keepTopItemOverscrollBackground = ListViewKeepTopItemOverscrollBackground(color: presentationData.theme.list.blocksBackgroundColor, direction: true)
         self.listNode.accessibilityPageScrolledString = { row, count in
             return presentationData.strings.VoiceOver_ScrollStatus(row, count).string
@@ -459,7 +461,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
         default:
             break
         }
-        
+        chatTranslationAvailable = true; translateButtonAvailable = true // MARK: Swiftgram
         let previousState = Atomic<LocalizationListState?>(value: nil)
         let previousEntriesHolder = Atomic<([LanguageListEntry], PresentationTheme, PresentationStrings)?>(value: nil)
         self.listDisposable = combineLatest(
@@ -476,6 +478,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                 return
             }
             
+            // MARK: Swiftgram
             let isPremium = peer?.isPremium ?? false
                         
             var entries: [LanguageListEntry] = []
@@ -490,7 +493,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
             var ignoredLanguages: [String] = []
             if let translationSettings = sharedData.entries[ApplicationSpecificSharedDataKeys.translationSettings]?.get(TranslationSettings.self) {
                 showTranslate = translationSettings.showTranslate
-                translateChats = isPremium ? translationSettings.translateChats : false
+                translateChats = translationSettings.translateChats
                 if let languages = translationSettings.ignoredLanguages {
                     ignoredLanguages = languages
                 } else {
@@ -511,7 +514,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                     }
                 }
             } else {
-                translateChats = isPremium
+                translateChats = isPremium || true
                 if let activeLanguage = activeLanguageCode, supportedTranslationLanguages.contains(activeLanguage) {
                     ignoredLanguages = [activeLanguage]
                 }
@@ -532,7 +535,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                         entries.append(.translate(text: presentationData.strings.Localization_ShowTranslate, value: showTranslate))
                     }
                     if chatTranslationAvailable {
-                        entries.append(.translateEntire(text: presentationData.strings.Localization_TranslateEntireChat, value: translateChats, locked: !isPremium))
+                        entries.append(.translateEntire(text: presentationData.strings.Localization_TranslateEntireChat, value: translateChats, locked: !(isPremium || true)))
                     }
                     
                     var value = ""
@@ -583,6 +586,17 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                 } else {
                     entries.append(.localizationTitle(text: presentationData.strings.Localization_InterfaceLanguage.uppercased(), section: LanguageListSection.official.rawValue))
                 }
+                
+                // MARK: Swiftrgam
+                for info in SGLocalizations {
+                    if existingIds.contains(info.languageCode) {
+                        continue
+                    }
+                    existingIds.insert(info.languageCode)
+                    entries.append(.localization(index: entries.count, info: info, type: .official, selected: info.languageCode == activeLanguageCode, activity: applyingCode == info.languageCode, revealed: revealedCode == info.languageCode, editing: false))
+                }
+                //
+                
                 for info in localizationListState.availableOfficialLocalizations {
                     if existingIds.contains(info.languageCode) {
                         continue
@@ -676,7 +690,7 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
         
         var listInsets = layout.insets(options: [.input])
         listInsets.top += navigationBarHeight
-        if layout.size.width >= 375.0 {
+        if layout.size.width >= 320.0 {
             let inset = max(16.0, floor((layout.size.width - 674.0) / 2.0))
             listInsets.left += inset
             listInsets.right += inset
@@ -741,6 +755,16 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                     if !strongSelf.didSetReady {
                         strongSelf.didSetReady = true
                         strongSelf._ready.set(true)
+                        
+                        if let focusOnItemTag = strongSelf.focusOnItemTag {
+                            strongSelf.focusOnItemTag = nil
+                            
+                            strongSelf.listNode.forEachItemNode { itemNode in
+                                if let itemNode = itemNode as? ItemListItemNode, let tag = itemNode.tag, tag.isEqual(to: focusOnItemTag) {
+                                    itemNode.displayHighlight()
+                                }
+                            }
+                        }
                     }
                 }
             })
@@ -758,6 +782,13 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
                     self?.applyingCode.set(.single(nil))
                 
                     self?.context.engine.messages.refreshAttachMenuBots()
+                    
+                    // MARK: Swiftgram
+                    // TODO(swiftgram): consider moving to downloadAndApplyLocalization for an app-wide strings update
+                    if let baseLanguageCode = info.baseLanguageCode {
+                        SGLocalizationManager.shared.downloadLocale(baseLanguageCode)
+                    }
+
                 }))
         }
         if info.isOfficial {
@@ -781,13 +812,12 @@ final class LocalizationListControllerNode: ViewControllerTracingNode {
             guard let strongSelf = self else {
                 return
             }
-            let shareController = ShareController(context: strongSelf.context, subject: .url("https://t.me/setlanguage/\(info.languageCode)"))
-            shareController.actionCompleted = { [weak self] in
+            let shareController = strongSelf.context.sharedContext.makeShareController(context: strongSelf.context, params: ShareControllerParams(subject: .url("https://t.me/setlanguage/\(info.languageCode)"), actionCompleted: { [weak self] in
                 if let strongSelf = self {
                     let presentationData = strongSelf.context.sharedContext.currentPresentationData.with { $0 }
                     strongSelf.present(UndoOverlayController(presentationData: presentationData, content: .linkCopied(title: nil, text: presentationData.strings.Conversation_LinkCopied), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), nil)
                 }
-            }
+            }))
             strongSelf.present(shareController, nil)
         }))
         controller.setItemGroups([

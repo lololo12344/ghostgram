@@ -3,12 +3,26 @@ import SGLogging
 import SGGHSettingsScheme
 import AccountContext
 import TelegramCore
-import SwiftSignalKit
 
 
 public func updateSGGHSettingsInteractivelly(context: AccountContext) {
-    _ = context
-    // Security hardening: remote settings fetch from Swiftgram's server removed.
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    let locale = presentationData.strings.baseLanguageCode
+    let _ = Task {
+        do {
+            let settings = try await fetchSGGHSettings(locale: locale)
+            let _ = await (context.account.postbox.transaction { transaction in
+                updateAppConfiguration(transaction: transaction, { configuration -> AppConfiguration in
+                    var configuration = configuration
+                    configuration.sgGHSettings = settings
+                    return configuration
+                })
+            }).task()
+        } catch {
+            return
+        }
+
+    }
 }
 
 
@@ -22,7 +36,7 @@ enum SGGHFetchError: Error {
 }
 
 func fetchSGGHSettings(locale: String) async throws -> SGGHSettings {
-    let baseURL = "http://127.0.0.1"
+    let baseURL = "https://raw.githubusercontent.com/Swiftgram/settings/refs/heads/main"
     var candidates: [String] = []
     if let buildNumber = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
         if locale != "en" {

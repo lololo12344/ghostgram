@@ -473,6 +473,7 @@ final class GiftListItemComponent: Component {
                                 content: AnyComponent(
                                     GiftItemComponent(
                                         context: component.context,
+                                        style: .glass,
                                         theme: component.theme,
                                         strings: presentationData.strings,
                                         peer: nil,

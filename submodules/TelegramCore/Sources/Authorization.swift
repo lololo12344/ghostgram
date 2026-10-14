@@ -527,8 +527,8 @@ private func internalResendAuthorizationCode(accountManager: AccountManager<Tele
                 
                 return .single(.sentCode(account))
             case let .sentCodePaymentRequired(sentCodePaymentRequiredData):
-                let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject)
-                transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: number, codeHash: codeHash, storeProduct: storeProduct, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
+                let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject, premiumDays) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject, sentCodePaymentRequiredData.premiumDays)
+                transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: number, codeHash: codeHash, storeProduct: storeProduct, premiumDays: premiumDays, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
                 return .single(.sentCode(account))
             case .sentCodeSuccess:
                 return .single(.loggedIn)
@@ -638,8 +638,8 @@ public func resendAuthorizationCode(accountManager: AccountManager<TelegramAccou
                                     
                                     transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .confirmationCodeEntry(number: number, type: parsedType, hash: phoneCodeHash, timeout: codeTimeout, nextType: parsedNextType, syncContacts: syncContacts, previousCodeEntry: previousCodeEntry, usePrevious: false)))
                                 case let .sentCodePaymentRequired(sentCodePaymentRequiredData):
-                                    let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject)
-                                    transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: number, codeHash: codeHash, storeProduct: storeProduct, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
+                                    let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject, premiumDays) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject, sentCodePaymentRequiredData.premiumDays)
+                                    transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: number, codeHash: codeHash, storeProduct: storeProduct, premiumDays: premiumDays, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
                                 case .sentCodeSuccess:
                                     break
                                 }
@@ -922,8 +922,8 @@ public func verifyLoginEmailSetup(account: UnauthorizedAccount, code: Authorizat
 
                                         transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .confirmationCodeEntry(number: phoneNumber, type: SentAuthorizationCodeType(apiType: type), hash: phoneCodeHash, timeout: timeout, nextType: parsedNextType, syncContacts: syncContacts, previousCodeEntry: nil, usePrevious: false)))
                                     case let .sentCodePaymentRequired(sentCodePaymentRequiredData):
-                                        let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject)
-                                        transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: phoneNumber, codeHash: codeHash, storeProduct: storeProduct, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
+                                        let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject, premiumDays) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject, sentCodePaymentRequiredData.premiumDays)
+                                        transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: phoneNumber, codeHash: codeHash, storeProduct: storeProduct, premiumDays: premiumDays, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
                                     case .sentCodeSuccess:
                                         break
                                     }
@@ -989,8 +989,8 @@ public func resetLoginEmail(account: UnauthorizedAccount, phoneNumber: String, p
 
                                 return .complete()
                             case let .sentCodePaymentRequired(sentCodePaymentRequiredData):
-                                let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject)
-                                transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: phoneNumber, codeHash: codeHash, storeProduct: storeProduct, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
+                                let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject, premiumDays) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject, sentCodePaymentRequiredData.premiumDays)
+                                transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: phoneNumber, codeHash: codeHash, storeProduct: storeProduct, premiumDays: premiumDays, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
                                 return .complete()
                             case .sentCodeSuccess:
                                 return .complete()
@@ -1321,16 +1321,6 @@ public func authorizeWithPasskey(accountManager: AccountManager<TelegramAccountM
     }
 }
 
-public enum PasswordRecoveryRequestError {
-    case limitExceeded
-    case generic
-}
-
-public enum PasswordRecoveryOption {
-    case none
-    case email(pattern: String)
-}
-
 public enum PasswordRecoveryError {
     case invalidCode
     case limitExceeded
@@ -1586,18 +1576,6 @@ public func signUpWithName(accountManager: AccountManager<TelegramAccountManager
     |> switchToLatest
 }
 
-public enum AuthorizationStateReset {
-    case empty
-}
-
-public func resetAuthorizationState(account: UnauthorizedAccount, to value: AuthorizationStateReset) -> Signal<Void, NoError> {
-    return account.postbox.transaction { transaction -> Void in
-        if let state = transaction.getState() as? UnauthorizedAccountState {
-            transaction.setState(UnauthorizedAccountState(isTestingEnvironment: state.isTestingEnvironment, masterDatacenterId: state.masterDatacenterId, contents: .empty))
-        }
-    }
-}
-
 public func togglePreviousCodeEntry(account: UnauthorizedAccount) -> Signal<Never, NoError> {
     return account.postbox.transaction { transaction -> Void in
         if let state = transaction.getState() as? UnauthorizedAccountState {
@@ -1623,3 +1601,147 @@ func _internal_reportMissingCode(network: Network, phoneNumber: String, phoneCod
     }
 }
 
+public enum TestLoginAndDeleteAccountError {
+    case generic
+}
+
+public func test_loginAndDeleteAccount(
+    rootPath: String,
+    accountManager: AccountManager<TelegramAccountManagerTypes>,
+    networkArguments: NetworkInitializationArguments,
+    encryptionParameters: ValueBoxEncryptionParameters,
+    phoneNumber: String,
+    phoneCode: String
+) -> Signal<Never, TestLoginAndDeleteAccountError> {
+    Logger.shared.logToConsole = true
+
+    return accountManager.transaction{ transaction -> AccountRecordId? in
+        let record = transaction.createAuth([.environment(AccountEnvironmentAttribute(environment: .test))])
+        return record?.id
+    }
+    |> castError(TestLoginAndDeleteAccountError.self)
+    |> mapToSignal { accountId -> Signal<UnauthorizedAccount, TestLoginAndDeleteAccountError> in
+        guard let accountId else {
+            preconditionFailure("Account not found")
+        }
+        return accountWithId(
+            accountManager: accountManager,
+            networkArguments: networkArguments,
+            id: accountId,
+            encryptionParameters: encryptionParameters,
+            supplementary: false,
+            isSupportUser: false,
+            rootPath: rootPath,
+            beginWithTestingEnvironment: true,
+            backupData: nil,
+            auxiliaryMethods: AccountAuxiliaryMethods(fetchResource: { _, _, _, _ in
+                return nil
+            }, fetchResourceMediaReferenceHash: { resource in
+                return .single(nil)
+            }, prepareSecretThumbnailData: { data in
+                return nil
+            }, backgroundUpload: { postbox, _, resource in
+                return .single(nil)
+            })
+        )
+        |> castError(TestLoginAndDeleteAccountError.self)
+        |> mapToSignal { account -> Signal<UnauthorizedAccount, TestLoginAndDeleteAccountError> in
+            switch account {
+            case .upgrading:
+                preconditionFailure("Unexpected account state: upgrading")
+            case let .unauthorized(account):
+                return .single(account)
+            case .authorized:
+                preconditionFailure("Unexpected account state: authorized")
+            }
+        }
+    }
+    |> mapToSignal { account -> Signal<(UnauthorizedAccount, UnauthorizedAccountStateContents), TestLoginAndDeleteAccountError> in
+        account.shouldBeServiceTaskMaster.set(.single(.now))
+
+        return sendAuthorizationCode(
+            accountManager: accountManager,
+            account: account,
+            phoneNumber: phoneNumber,
+            apiId: networkArguments.apiId,
+            apiHash: networkArguments.apiHash,
+            pushNotificationConfiguration: nil,
+            firebaseSecretStream: .never(),
+            syncContacts: false,
+            forcedPasswordSetupNotice: { _ in nil }
+        )
+        |> mapError { error -> TestLoginAndDeleteAccountError in
+            NSLog("[DeleteAccount] sendAuthorizationCode error: \(error)")
+            return .generic
+        }
+        |> mapToSignal { result -> Signal<(UnauthorizedAccount, UnauthorizedAccountStateContents), TestLoginAndDeleteAccountError> in
+            switch result {
+            case .loggedIn:
+                preconditionFailure("Unexpected send code state: logged in")
+            case let .sentCode(account):
+                return account.postbox.transaction { transaction -> UnauthorizedAccountStateContents? in
+                    guard let state = transaction.getState() as? UnauthorizedAccountState else {
+                        return nil
+                    }
+                    return state.contents
+                }
+                |> castError(TestLoginAndDeleteAccountError.self)
+                |> mapToSignal { state -> Signal<(UnauthorizedAccount, UnauthorizedAccountStateContents), TestLoginAndDeleteAccountError> in
+                    guard let state else {
+                        preconditionFailure("Unexpected account state: nil")
+                    }
+                    return .single((account, state))
+                }
+            }
+        }
+    }
+    |> mapToSignal { account, state -> Signal<(UnauthorizedAccount, AuthorizeWithCodeResult), TestLoginAndDeleteAccountError> in
+        account.shouldBeServiceTaskMaster.set(.single(.now))
+        
+        switch state {
+        case let .confirmationCodeEntry(_, type, _, _, _, _, _, _):
+            switch type {
+            case let .call(length), let .sms(length), let .otherSession(length):
+                if phoneCode.count != length {
+                    preconditionFailure("Unexpected sent code length: \(length) != \(phoneCode.count)")
+                }
+                
+                return authorizeWithCode(
+                    accountManager: accountManager,
+                    account: account,
+                    code: .phoneCode(phoneCode),
+                    termsOfService: nil,
+                    forcedPasswordSetupNotice: { _ in nil }
+                )
+                |> mapError { _ -> TestLoginAndDeleteAccountError in
+                    return .generic
+                }
+                |> mapToSignal { result -> Signal<(UnauthorizedAccount, AuthorizeWithCodeResult), TestLoginAndDeleteAccountError> in
+                    return .single((account, result))
+                }
+            default:
+                preconditionFailure("Unexpected sent code type: \(type)")
+            }
+        default:
+            preconditionFailure("Unexpected account state: \(state)")
+        }
+    }
+    |> mapToSignal { account, checkCodeResult -> Signal<Never, TestLoginAndDeleteAccountError> in
+        switch checkCodeResult {
+        case .signUp:
+            return .complete()
+        case .loggedIn:
+            return account.network.request(Api.functions.account.deleteAccount(
+                flags: 0,
+                reason: "",
+                password: nil
+            ))
+            |> mapError { _ -> TestLoginAndDeleteAccountError in
+                return .generic
+            }
+            |> mapToSignal { _ -> Signal<Never, TestLoginAndDeleteAccountError> in
+                return .complete()
+            }
+        }
+    }
+}

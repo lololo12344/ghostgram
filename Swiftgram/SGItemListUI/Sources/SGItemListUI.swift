@@ -1,3 +1,9 @@
+// MARK: Swiftgram
+import SGLogging
+import SGSimpleSettings
+import SGStrings
+import SGAPIToken
+
 import Foundation
 import UIKit
 import Display
@@ -202,11 +208,11 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
             )
         
         case let .peerColorDisclosurePreview(_, _, name, color):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: " ", enabled: false, label: name, labelStyle: .semitransparentBadge(color), sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: " ", enabled: false, label: name, labelStyle: .semitransparentBadge(color), centerLabelAlignment: true, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
             })
         
         case let .oneFromManySelector(_, _, settingName, text, value, enabled):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, enabled: enabled, label: value, sectionId: self.section, style: .blocks, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, enabled: enabled, label: value, sgLabelMaximumNumberOfLines: 2, sectionId: self.section, style: .blocks, action: {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) // Closing search keyboard if active
                 arguments.setOneFromManyValue(settingName)
             })
@@ -216,9 +222,7 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
                     arguments.action(actionType)
             })
         case let .searchInput(_, _, title, text, placeholder):
-            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: title, text: text, placeholder: placeholder, returnKeyType: .done, spacing: 3.0, clearType: .always, selectAllOnFocus: true, secondaryStyle: true, sectionId: self.section, textUpdated: { input in arguments.searchInput(input) }, action: {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            })
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: title, text: text, placeholder: placeholder, returnKeyType: .done, spacing: 3.0, clearType: .always, selectAllOnFocus: true, secondaryStyle: true, sectionId: self.section, textUpdated: { input in arguments.searchInput(input) }, action: {}, dismissKeyboardOnEnter: true)
         }
     }
 }

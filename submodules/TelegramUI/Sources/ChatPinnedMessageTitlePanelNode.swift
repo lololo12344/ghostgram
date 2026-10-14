@@ -3,7 +3,6 @@ import Foundation
 import UIKit
 import Display
 import AsyncDisplayKit
-import Postbox
 import TelegramCore
 import SwiftSignalKit
 import TelegramPresentationData
@@ -25,6 +24,7 @@ import MultiAnimationRenderer
 import TranslateUI
 import ChatControllerInteraction
 import LegacyChatHeaderPanelComponent
+import UIKitRuntimeUtils
 
 private enum PinnedMessageAnimation {
     case slideToTop
@@ -86,6 +86,16 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
     private let animationRenderer: MultiAnimationRenderer?
 
     private let queue = Queue()
+    
+    private var captureProtected: Bool = false {
+        didSet {
+            if self.captureProtected != oldValue {
+                if self.isNodeLoaded {
+                    setLayerDisableScreenshots(self.contentContainer.layer, self.captureProtected)
+                }
+            }
+        }
+    }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         if let buttonResult = self.buttonsContainer.hitTest(point.offsetBy(dx: -self.buttonsContainer.frame.minX, dy: -self.buttonsContainer.frame.minY), with: event) {
@@ -282,6 +292,8 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         }
         self.isReplyThread = isReplyThread
         
+        self.captureProtected = interfaceState.copyProtectionEnabled || interfaceState.myCopyProtectionEnabled
+        
         self.contextContainer.isGestureEnabled = !isReplyThread
         
         var actionTitle: String?
@@ -396,7 +408,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         var tapButtonRightInset: CGFloat = rightInset
         
         let buttonsContainerSize = CGSize(width: 16.0, height: panelHeight)
-        self.buttonsContainer.frame = CGRect(origin: CGPoint(x: width - buttonsContainerSize.width - rightInset, y: 0.0), size: buttonsContainerSize)
+        self.buttonsContainer.frame = CGRect(origin: CGPoint(x: width - buttonsContainerSize.width - rightInset - 4.0, y: 0.0), size: buttonsContainerSize)
         
         let closeButtonSize = self.closeButton.measure(CGSize(width: 100.0, height: 100.0))
         
@@ -497,7 +509,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         if currentTranslateToLanguageUpdated || messageUpdated, let message = interfaceState.pinnedMessage?.message {
             if let translation = message.attributes.first(where: { $0 is TranslationMessageAttribute }) as? TranslationMessageAttribute, translation.toLang == translateToLanguage?.toLang || translation.toLang.hasPrefix("\(translateToLanguage?.toLang ?? "")-") /* MARK: Swiftgram */ {
             } else if let translateToLanguage  {
-                self.translationDisposable.set(translateMessageIds(context: self.context, messageIds: [message.id], fromLang: translateToLanguage.fromLang, toLang: translateToLanguage.toLang).startStrict())
+                self.translationDisposable.set(translateMessageIds(context: self.context, messageIds: [message.id], fromLang: translateToLanguage.fromLang, toLang: translateToLanguage.toLang, viaText: !self.context.isPremium || SGSimpleSettings.shared.translationBackend == SGSimpleSettings.TranslationBackend.gtranslate.rawValue).startStrict())
             }
         }
         
@@ -558,7 +570,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         }
     }
     
-    private func enqueueTransition(width: CGFloat, panelHeight: CGFloat, leftInset: CGFloat, rightInset: CGFloat, transition: ContainedViewLayoutTransition, animation: PinnedMessageAnimation?, pinnedMessage: ChatPinnedMessage, theme: PresentationTheme, strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, accountPeerId: PeerId, firstTime: Bool, isReplyThread: Bool, translateToLanguage: String?) {
+    private func enqueueTransition(width: CGFloat, panelHeight: CGFloat, leftInset: CGFloat, rightInset: CGFloat, transition: ContainedViewLayoutTransition, animation: PinnedMessageAnimation?, pinnedMessage: ChatPinnedMessage, theme: PresentationTheme, strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, accountPeerId: EnginePeer.Id, firstTime: Bool, isReplyThread: Bool, translateToLanguage: String?) {
         let message = pinnedMessage.message
         
         var animationTransition: ContainedViewLayoutTransition = .immediate
@@ -596,7 +608,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         let previousMediaReference = self.previousMediaReference
         let context = self.context
         
-        let contentLeftInset: CGFloat = leftInset + 10.0
+        let contentLeftInset: CGFloat = leftInset + 18.0
         var textLineInset: CGFloat = 10.0
         var rightInset: CGFloat = 14.0 + rightInset
         
@@ -649,7 +661,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
                 } else if let paidContent = media as? TelegramMediaPaidContent, let firstMedia = paidContent.extendedMedia.first {
                     switch firstMedia {
                     case let .preview(dimensions, immediateThumbnailData, _):
-                        let thumbnailMedia = TelegramMediaImage(imageId: MediaId(namespace: 0, id: 0), representations: [], immediateThumbnailData: immediateThumbnailData, reference: nil, partialReference: nil, flags: [])
+                        let thumbnailMedia = TelegramMediaImage(imageId: EngineMedia.Id(namespace: 0, id: 0), representations: [], immediateThumbnailData: immediateThumbnailData, reference: nil, partialReference: nil, flags: [])
                         if let dimensions {
                             imageDimensions = dimensions.cgSize
                         }
@@ -695,7 +707,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         var applyImage: (() -> Void)?
         if let imageDimensions = imageDimensions {
             let boundingSize = CGSize(width: 35.0, height: 35.0)
-            applyImage = imageNodeLayout(TransformImageArguments(corners: ImageCorners(radius: 2.0), imageSize: imageDimensions.aspectFilled(boundingSize), boundingSize: boundingSize, intrinsicInsets: UIEdgeInsets()))
+            applyImage = imageNodeLayout(TransformImageArguments(corners: ImageCorners(radius: 8.0), imageSize: imageDimensions.aspectFilled(boundingSize), boundingSize: boundingSize, intrinsicInsets: UIEdgeInsets()))
             
             textLineInset += 9.0 + 35.0
         }
@@ -710,7 +722,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
         let hasSpoiler = message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute })
         
         var updateImageSignal: Signal<(TransformImageArguments) -> DrawingContext?, NoError>?
-        var updatedFetchMediaSignal: Signal<FetchResourceSourceType, FetchResourceError>?
+        var updatedFetchMediaSignal: Signal<EngineFetchResourceSourceType, EngineFetchResourceError>?
         if mediaUpdated {
             if let updatedMediaReference = updatedMediaReference, imageDimensions != nil {
                 if let imageReference = updatedMediaReference.concrete(TelegramMediaImage.self) {
@@ -723,7 +735,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
                     if fileReference.media.isAnimatedSticker {
                         let dimensions = fileReference.media.dimensions ?? PixelDimensions(width: 512, height: 512)
                         updateImageSignal = chatMessageAnimatedSticker(postbox: context.account.postbox, userLocation: .peer(message.id.peerId), file: fileReference.media, small: false, size: dimensions.cgSize.aspectFitted(CGSize(width: 160.0, height: 160.0)))
-                        updatedFetchMediaSignal = fetchedMediaResource(mediaBox: context.account.postbox.mediaBox, userLocation: .peer(message.id.peerId), userContentType: MediaResourceUserContentType(file: fileReference.media), reference: fileReference.resourceReference(fileReference.media.resource))
+                        updatedFetchMediaSignal = context.engine.resources.fetch(reference: fileReference.resourceReference(fileReference.media.resource), userLocation: .peer(message.id.peerId), userContentType: MediaResourceUserContentType(file: fileReference.media))
                     } else if fileReference.media.isVideo || fileReference.media.isAnimated {
                         updateImageSignal = chatMessageVideoThumbnail(account: context.account, userLocation: .peer(message.id.peerId), fileReference: fileReference, blurred: hasSpoiler)
                     } else if let iconImageRepresentation = smallestImageRepresentation(fileReference.media.previewRepresentations) {
@@ -782,10 +794,16 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
                 messageText = NSAttributedString(string: foldLineBreaks(text), font: textFont, textColor: textColor)
             }
         } else {
-            messageText = NSAttributedString(string: foldLineBreaks(textString.string), font: textFont, textColor: message.media.isEmpty || message.media.first is TelegramMediaWebpage ? theme.chat.inputPanel.primaryTextColor : theme.chat.inputPanel.secondaryTextColor)
+            let textColor = message.media.isEmpty || message.media.first is TelegramMediaWebpage ? theme.chat.inputPanel.primaryTextColor : theme.chat.inputPanel.secondaryTextColor
+            let mutableTextString = NSMutableAttributedString(attributedString: foldLineBreaks(textString))
+            mutableTextString.addAttributes([
+                .font: textFont,
+                .foregroundColor: textColor
+            ], range: NSRange(location: 0, length: mutableTextString.length))
+            messageText = renderInstantPagePreviewIcons(mutableTextString, font: textFont, textColor: textColor)
         }
         
-        let textConstrainedSize = CGSize(width: width - textLineInset - contentLeftInset - rightInset - textRightInset, height: CGFloat.greatestFiniteMagnitude)
+        let textConstrainedSize = CGSize(width: width - textLineInset - contentLeftInset - rightInset - textRightInset - 10.0, height: CGFloat.greatestFiniteMagnitude)
         let (textLayout, textApply) = makeTextLayout(TextNodeLayoutArguments(attributedString: messageText, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: textConstrainedSize, alignment: .natural, cutout: nil, insets: UIEdgeInsets(top: 2.0, left: 0.0, bottom: 2.0, right: 0.0)))
         
         let spoilerTextLayoutAndApply: (TextNodeLayout, (TextNodeWithEntities.Arguments?) -> TextNodeWithEntities)?
@@ -873,8 +891,8 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
             transition: animationTransition
         )
         
-        strongSelf.imageNodeContainer.frame = CGRect(origin: CGPoint(x: contentLeftInset + 9.0, y: 8.0), size: CGSize(width: 35.0, height: 35.0))
-        strongSelf.imageNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 35.0, height: 35.0))
+        strongSelf.imageNodeContainer.frame = CGRect(origin: CGPoint(x: contentLeftInset + 9.0, y: 7.0), size: CGSize(width: 36.0, height: 36.0))
+        strongSelf.imageNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 36.0, height: 36.0))
         
         if let applyImage = applyImage {
             applyImage()
@@ -923,7 +941,7 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
                     let button = attribute.rows[0].buttons[0]
                     switch button.action {
                     case .text:
-                        controllerInteraction.sendMessage(button.title)
+                        controllerInteraction.sendMessage(button.title, message.id)
                         return
                     case let .url(url):
                         var isConcealed = true
@@ -933,10 +951,10 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
                         controllerInteraction.openUrl(ChatControllerInteraction.OpenUrl(url: url, concealed: isConcealed, progress: Promise()))
                         return
                     case .requestMap:
-                        controllerInteraction.shareCurrentLocation()
+                        controllerInteraction.shareCurrentLocation(message.id)
                         return
                     case .requestPhone:
-                        controllerInteraction.shareAccountContact()
+                        controllerInteraction.shareAccountContact(message.id)
                         return
                     case .openWebApp:
                         let progressPromise = Promise<Bool>()
@@ -964,22 +982,22 @@ final class ChatPinnedMessageTitlePanelNode: ChatTitleAccessoryPanelNode {
                         })
                         return
                     case let .switchInline(samePeer, query, peerTypes):
-                        var botPeer: Peer?
-                        
+                        var botPeer: EnginePeer?
+
                         var found = false
                         for attribute in message.attributes {
                             if let attribute = attribute as? InlineBotMessageAttribute {
                                 if let peerId = attribute.peerId {
-                                    botPeer = message.peers[peerId]
+                                    botPeer = message.peers[peerId].flatMap(EnginePeer.init)
                                     found = true
                                 }
                             }
                         }
                         if !found {
-                            botPeer = message.author
+                            botPeer = message.author.flatMap(EnginePeer.init)
                         }
-                        
-                        var peerId: PeerId?
+
+                        var peerId: EnginePeer.Id?
                         if samePeer {
                             peerId = message.id.peerId
                         }

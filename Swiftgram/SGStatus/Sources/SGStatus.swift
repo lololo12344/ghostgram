@@ -1,14 +1,12 @@
 import Foundation
 import SwiftSignalKit
 import TelegramCore
-import TelegramUIPreferences
 
 public struct SGStatus: Equatable, Codable {
     public var status: Int64
     
     public static var `default`: SGStatus {
-        // Security hardening: all Pro features unlocked; subscription gating removed.
-        return SGStatus(status: 5)
+        return SGStatus(status: 1)
     }
     
     public init(status: Int64) {
@@ -18,7 +16,7 @@ public struct SGStatus: Equatable, Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: StringCodingKey.self)
 
-        self.status = try container.decodeIfPresent(Int64.self, forKey: "status") ?? 5
+        self.status = try container.decodeIfPresent(Int64.self, forKey: "status") ?? 1
     }
     
     public func encode(to encoder: Encoder) throws {

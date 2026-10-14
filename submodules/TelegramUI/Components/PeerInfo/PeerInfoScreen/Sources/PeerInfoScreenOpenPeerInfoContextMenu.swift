@@ -3,11 +3,13 @@ import UIKit
 import Display
 import AccountContext
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import AsyncDisplayKit
 import UndoUI
 import TranslateUI
+import TextProcessingScreen
+import Pasteboard
+import ChatRichTextEditorComposer
 import TelegramStringFormatting
 import TelegramUIPreferences
 
@@ -18,6 +20,7 @@ extension PeerInfoScreenNode {
         }
         let context = self.context
         switch subject {
+        // MARK: Swiftgram
         case let .copy(text):
             let contextMenuController = makeContextMenuController(actions: [ContextMenuAction(content: .text(title: self.presentationData.strings.Conversation_ContextMenuCopy, accessibilityLabel: self.presentationData.strings.Conversation_ContextMenuCopy), action: { [weak self] in
                 UIPasteboard.general.string = text
@@ -39,6 +42,7 @@ extension PeerInfoScreenNode {
         case .aboutDC:
             let contextMenuController = makeContextMenuController(actions: [ContextMenuAction(content: .text(title: self.presentationData.strings.Passport_InfoLearnMore, accessibilityLabel: self.presentationData.strings.Passport_InfoLearnMore), action: { [weak self] in
                 self?.openUrl(url: "https://core.telegram.org/api/datacenter", concealed: false, external: false)
+
             })])
             controller.present(contextMenuController, in: .window(.root), with: ContextMenuControllerPresentationArguments(sourceNodeAndRect: { [weak self, weak sourceNode] in
                 if let controller = self?.controller, let sourceNode = sourceNode {
@@ -51,6 +55,7 @@ extension PeerInfoScreenNode {
                     return nil
                 }
             }))
+        ///
         case .birthday:
             if let cachedData = data.cachedData as? CachedUserData, let birthday = cachedData.birthday {
                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -104,16 +109,22 @@ extension PeerInfoScreenNode {
                     let (canTranslate, language) = canTranslateText(context: context, text: text, showTranslate: translationSettings.showTranslate, showTranslateIfTopical: false, ignoredLanguages: translationSettings.ignoredLanguages)
                     if canTranslate {
                         actions.append(ContextMenuAction(content: .text(title: presentationData.strings.Conversation_ContextMenuTranslate, accessibilityLabel: presentationData.strings.Conversation_ContextMenuTranslate), action: { [weak self] in
-                            
-                            let controller = TranslateScreen(context: context, text: text, canCopy: true, fromLanguage: language, ignoredLanguages: translationSettings.ignoredLanguages)
-                            controller.pushController = { [weak self] c in
-                                (self?.controller?.navigationController as? NavigationController)?._keepModalDismissProgress = true
-                                self?.controller?.push(c)
+                            Task { @MainActor [weak self] in
+                                guard let self, let parentController = self.controller else {
+                                    return
+                                }
+                                let controller = await TextProcessingScreen(
+                                    context: context,
+                                    mode: .translate(fromLanguage: language, applyResult: nil),
+                                    inputText: .plain(text: text, entities: []),
+                                    copyResult: { [weak parentController] text in
+                                        storeComposedRichMessageInPasteboard(text)
+                                        parentController?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: presentationData.strings.Conversation_TextCopied), elevatedLayout: true, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
+                                    },
+                                    translateChat: nil
+                                )
+                                parentController.present(controller, in: .window(.root))
                             }
-                            controller.presentController = { [weak self] c in
-                                self?.controller?.present(c, in: .window(.root))
-                            }
-                            self?.controller?.present(controller, in: .window(.root))
                         }))
                     }
                     
@@ -156,7 +167,7 @@ extension PeerInfoScreenNode {
                 text = customLink
                 content = .linkCopied(title: nil, text: self.presentationData.strings.Conversation_LinkCopied)
             } else if let addressName = peer.addressName {
-                if peer is TelegramChannel {
+                if case .channel = peer {
                     text = "https://t.me/\(addressName)"
                     content = .linkCopied(title: nil, text: self.presentationData.strings.Conversation_LinkCopied)
                 } else {

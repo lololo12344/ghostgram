@@ -25,6 +25,7 @@ enum PeerInfoHeaderButtonKey: Hashable {
 
 enum PeerInfoHeaderButtonIcon {
     case message
+    case discussion // MARK: Swiftgram
     case call
     case videoCall
     case voiceChat
@@ -42,7 +43,6 @@ final class PeerInfoHeaderButtonNode: HighlightableButtonNode {
     private let action: (PeerInfoHeaderButtonNode, ContextGesture?) -> Void
     let referenceNode: ContextReferenceContentNode
     let containerNode: ContextControllerSourceNode
-    //private let backgroundNode: NavigationBackgroundNode
     private let contentNode: ASDisplayNode
     private let iconNode: ASImageNode
     private let textNode: ImmediateTextNode
@@ -155,6 +155,7 @@ final class PeerInfoHeaderButtonNode: HighlightableButtonNode {
                 switch icon {
                 case .message:
                     imageName = "Peer Info/ButtonMessage"
+                case .discussion: imageName = "Chat/Empty Chat/ChannelMessages" // MARK: Swiftgram
                 case .call:
                     imageName = "Peer Info/ButtonCall"
                 case .videoCall:
@@ -176,7 +177,7 @@ final class PeerInfoHeaderButtonNode: HighlightableButtonNode {
                 case .stop:
                     imageName = "Peer Info/ButtonStop"
                 }
-                if let imageName = imageName, let image = generateTintedImage(image: UIImage(bundleImageName: imageName), color: .white) {
+                if let imageName = imageName, let image = generateTintedImage(image: UIImage(bundleImageName: imageName), color: .white, customSize: icon == .discussion ? CGSize(width: 26.0, height: 26.0) : nil /* MARK: Swiftgram */) {
                     let imageRect = CGRect(origin: CGPoint(x: floor((size.width - image.size.width) / 2.0), y: floor((size.height - image.size.height) / 2.0)), size: image.size)
                     context.clip(to: imageRect, mask: image.cgImage!)
                     context.fill(imageRect)

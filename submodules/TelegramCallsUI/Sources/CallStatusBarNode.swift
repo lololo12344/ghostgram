@@ -3,7 +3,6 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
@@ -22,7 +21,7 @@ private let pink = UIColor(rgb: 0xef436c)
 private let latePurple = UIColor(rgb: 0xaa56a6)
 private let latePink = UIColor(rgb: 0xef476f)
 
-private func callStatusBarTextForTimeout(value: Int32) -> String {
+private func textForTimeout(value: Int32) -> String {
     if value < 3600 {
         let minutes = value / 60
         let seconds = value % 60
@@ -221,7 +220,7 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
     private var presentationData: PresentationData?
     private let presentationDataDisposable = MetaDisposable()
     
-    private var currentPeer: Peer?
+    private var currentPeer: EnginePeer?
     private var currentCallTimer: SwiftSignalKit.Timer?
     private var currentCallState: PresentationCallState?
     private var currentGroupCallState: PresentationGroupCallSummaryState?
@@ -319,9 +318,17 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
             switch content {
                 case let .call(sharedContext, account, call):
                     self.presentationData = sharedContext.currentPresentationData.with { $0 }
+                    let callPeer = TelegramEngine(account: account).data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: call.peerId))
+                    |> mapToSignal { peer -> Signal<EnginePeer, NoError> in
+                        if let peer {
+                            return .single(peer)
+                        } else {
+                            return .never()
+                        }
+                    }
                     self.stateDisposable.set(
                         (combineLatest(
-                            account.postbox.loadedPeerWithId(call.peerId),
+                            callPeer,
                             call.state,
                             call.isMuted
                         )
@@ -360,9 +367,9 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
                             strongSelf.update()
                         }
                     }))
-                    let callPeerView: Signal<PeerView?, NoError>
+                    let callPeerView: Signal<EnginePeer?, NoError>
                     if let peerId = call.peerId {
-                        callPeerView = account.postbox.peerView(id: peerId) |> map(Optional.init)
+                        callPeerView = TelegramEngine(account: account).data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
                     } else {
                         callPeerView = .single(nil)
                     }
@@ -376,7 +383,7 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
                     |> deliverOnMainQueue).start(next: { [weak self] view, state, isMuted, members in
                         if let strongSelf = self {
                             if let view {
-                                strongSelf.currentPeer = view.peers[view.peerId]
+                                strongSelf.currentPeer = view
                             } else {
                                 strongSelf.currentPeer = nil
                             }
@@ -421,14 +428,14 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
                         var effectiveLevel: Float = 0.0
                         var audioLevels = audioLevels
                         if !strongSelf.currentIsMuted {
-                            audioLevels.append((PeerId(0), 0, myAudioLevel, true))
+                            audioLevels.append((EnginePeer.Id(0), 0, myAudioLevel, true))
                         }
                         effectiveLevel = audioLevels.map { $0.2 }.max() ?? 0.0
                         strongSelf.backgroundNode.audioLevel = effectiveLevel
                     }))
                 
                     if let groupCall = call as? PresentationGroupCallImpl {
-                        let _ = (allowedStoryReactions(account: account)
+                        let _ = (allowedStoryReactions(engine: TelegramEngine(account: account))
                         |> deliverOnMainQueue).start(next: { [weak self] reactionItems in
                             self?.reactionItems = reactionItems
                         })
@@ -462,7 +469,7 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
             if let voiceChatTitle = self.currentGroupCallState?.info?.title, !voiceChatTitle.isEmpty {
                 title = voiceChatTitle
             } else if let currentPeer = self.currentPeer {
-                title = EnginePeer(currentPeer).displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                title = currentPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
             }
             var membersCount: Int32?
             if let groupCallState = self.currentGroupCallState {
@@ -471,19 +478,19 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
                 membersCount = 1
             }
             
-            var speakingPeer: Peer?
+            var speakingPeer: EnginePeer?
             if let members = currentMembers {
-                var speakingPeers: [Peer] = []
+                var speakingPeers: [EnginePeer] = []
                 for member in members.participants {
                     if let memberPeer = member.peer, members.speakingParticipants.contains(memberPeer.id) {
-                        speakingPeers.append(memberPeer._asPeer())
+                        speakingPeers.append(memberPeer)
                     }
                 }
                 speakingPeer = speakingPeers.first
             }
-            
+
             if let speakingPeer = speakingPeer {
-                speakerSubtitle = EnginePeer(speakingPeer).displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                speakerSubtitle = speakingPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
             }
             displaySpeakerSubtitle = speakerSubtitle != title && !speakerSubtitle.isEmpty
             
@@ -498,9 +505,9 @@ public class CallStatusBarNodeImpl: CallStatusBarNode {
                     timerText = presentationData.strings.VoiceChat_StatusStartsIn(scheduledTimeIntervalString(strings: presentationData.strings, value: elapsedTime)).string
                 } else if elapsedTime < 0 {
                     isLate = true
-                    timerText = presentationData.strings.VoiceChat_StatusLateBy(callStatusBarTextForTimeout(value: abs(elapsedTime))).string
+                    timerText = presentationData.strings.VoiceChat_StatusLateBy(textForTimeout(value: abs(elapsedTime))).string
                 } else {
-                    timerText = presentationData.strings.VoiceChat_StatusStartsIn(callStatusBarTextForTimeout(value: elapsedTime)).string
+                    timerText = presentationData.strings.VoiceChat_StatusStartsIn(textForTimeout(value: elapsedTime)).string
                 }
                 segments.append(.text(0, NSAttributedString(string: timerText, font: textFont, textColor: textColor)))
             } else if let membersCount = membersCount {

@@ -1,7 +1,7 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
 sgdeps = [
-    "//Swiftgram/SwiftSoup:SwiftSoup",
+    "//Swiftgram/SGGTranslate:SGGTranslate",
     "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
     "//Swiftgram/SGTranslationLangFix:SGTranslationLangFix",
     "//Swiftgram/SGWebSettingsScheme:SGWebSettingsScheme",

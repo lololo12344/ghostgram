@@ -274,7 +274,7 @@ final class CraftTableComponent: Component {
                     if !component.isCrafting || self.isFailed {
                         faceItems.append(
                             AnyComponentWithIdentity(id: "glass", component: AnyComponent(
-                                GlassBackgroundComponent(size: CGSize(width: cubeSide, height: cubeSide), cornerRadius: 28.0, isDark: true, tintColor: .init(kind: .custom, color: component.buttonColor))
+                                GlassBackgroundComponent(size: CGSize(width: cubeSide, height: cubeSide), cornerRadius: 28.0, isDark: true, tintColor: .init(kind: .custom(style: .default, color: component.buttonColor)))
                             ))
                         )
                     }
@@ -526,9 +526,6 @@ final class GiftSlotComponent: Component {
         }
         
         @objc private func buttonPressed() {
-            guard let _ = self.component?.removeAction else {
-                return
-            }
             self.component?.action()
         }
         
@@ -542,7 +539,7 @@ final class GiftSlotComponent: Component {
             self.state = state
             
             let backgroundFrame = CGRect(origin: .zero, size: availableSize).insetBy(dx: 1.0, dy: 1.0)
-            self.backgroundView.update(size: backgroundFrame.size, cornerRadius: 28.0, isDark: true, tintColor: .init(kind: .custom, color: component.buttonColor), isInteractive: true, transition: .immediate)
+            self.backgroundView.update(size: backgroundFrame.size, cornerRadius: 28.0, isDark: true, tintColor: .init(kind: .custom(style: .default, color: component.buttonColor)), isInteractive: true, transition: .immediate)
             transition.setFrame(view: self.backgroundView, frame: backgroundFrame)
             if component.gift == nil && component.isCrafting && previousComponent?.isCrafting == false {
                 transition.setBlur(layer: self.backgroundView.layer, radius: 10.0)
@@ -630,7 +627,7 @@ final class GiftSlotComponent: Component {
                         )
                     ),
                     environment: {},
-                    containerSize: CGSize(width: availableSize.width, height: availableSize.height)
+                    containerSize: CGSize(width: availableSize.width - 2.0 + UIScreenPixel, height: availableSize.height - 2.0 + UIScreenPixel)
                 )
                 let iconFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: iconSize)
                 if let iconView = icon.view {

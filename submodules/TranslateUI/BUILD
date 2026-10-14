@@ -1,8 +1,7 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
 sgdeps = [
-    "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
-    "//submodules/TextFormat:TextFormat"
+    "//Swiftgram/SGSimpleSettings:SGSimpleSettings"
 ]
 
 swift_library(
@@ -18,7 +17,6 @@ swift_library(
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/AsyncDisplayKit:AsyncDisplayKit",
         "//submodules/Display:Display",
-        "//submodules/Postbox:Postbox",
         "//submodules/TelegramCore:TelegramCore",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/AccountContext:AccountContext",
@@ -39,6 +37,13 @@ swift_library(
         "//submodules/ShimmerEffect:ShimmerEffect",
         "//submodules/Components/ResizableSheetComponent",
         "//submodules/TelegramUI/Components/GlassBarButtonComponent",
+        "//submodules/TelegramUI/Components/ListSectionComponent",
+        "//submodules/TelegramUI/Components/ListActionItemComponent",
+        "//submodules/TelegramUI/Components/PlainButtonComponent",
+        "//submodules/TelegramUI/Components/ButtonComponent",
+        "//submodules/TextFormat",
+        "//submodules/Pasteboard",
+        "//submodules/TelegramUI/Components/TranslationLanguagesContextMenuContent",
     ],
     visibility = [
         "//visibility:public",

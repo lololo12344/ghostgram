@@ -3,7 +3,6 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import LiveLocationTimerNode
 import PhotoResources
@@ -89,6 +88,8 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                             activeLiveBroadcastingTimeout = liveBroadcastingTimeout
                         }
                     }
+                } else if let poll = media as? TelegramMediaPoll, let telegramMap = poll.attachedMedia as? TelegramMediaMap {
+                    selectedMedia = telegramMap
                 }
             }
             
@@ -223,7 +224,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                 } else {
                     dateFormat = .regular
                 }
-                let dateText = stringForMessageTimestampStatus(accountPeerId: item.context.account.peerId, message: item.message, dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: dateFormat, associatedData: item.associatedData)
+                let dateText = stringForMessageTimestampStatus(context: item.context, message: EngineMessage(item.message), dateTimeFormat: item.presentationData.dateTimeFormat, nameDisplayOrder: item.presentationData.nameDisplayOrder, strings: item.presentationData.strings, format: dateFormat, associatedData: item.associatedData)
                 
                 let statusType: ChatMessageDateAndStatusType?
                 if case .customChatContents = item.associatedData.subject {
@@ -274,11 +275,10 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                         context: item.context,
                         presentationData: item.presentationData,
                         edited: edited,
-                        isDeleted: item.topMessage.ghostgramIsDeleted,
                         impressionCount: !item.presentationData.isPreview ? viewCount : nil,
                         dateText: dateText,
                         type: statusType,
-                        layoutInput: .standalone(reactionSettings: shouldDisplayInlineDateReactions(message: item.message, isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.StandaloneReactionSettings() : nil),
+                        layoutInput: .standalone(reactionSettings: shouldDisplayInlineDateReactions(message: EngineMessage(item.message), isPremium: item.associatedData.isPremium, forceInline: item.associatedData.forceInlineReactions) ? ChatMessageDateAndStatusNode.StandaloneReactionSettings() : nil),
                         constrainedSize: CGSize(width: constrainedSize.width, height: CGFloat.greatestFiniteMagnitude),
                         availableReactions: item.associatedData.availableReactions,
                         savedMessageTags: item.associatedData.savedMessageTags,
@@ -292,7 +292,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                         starsCount: starsCount,
                         isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
                         hasAutoremove: item.message.isSelfExpiring,
-                        canViewReactionList: canViewMessageReactionList(message: item.topMessage),
+                        canViewReactionList: canViewMessageReactionList(message: EngineMessage(item.topMessage)),
                         animationCache: item.controllerInteraction.presentationContext.animationCache,
                         animationRenderer: item.controllerInteraction.presentationContext.animationRenderer
                     ))
@@ -438,7 +438,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
                                             if let strongSelf = self {
                                                 strongSelf.timeoutTimer?.0.invalidate()
                                                 strongSelf.timeoutTimer = nil
-                                                item.controllerInteraction.requestMessageUpdate(item.message.id, false)
+                                                item.controllerInteraction.requestMessageUpdate(item.message.id, false, nil)
                                             }
                                         }, queue: Queue.mainQueue())
                                         strongSelf.timeoutTimer = (timer, timeoutDeadline)
@@ -504,7 +504,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
         self.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false)
     }
     
-    override public func transitionNode(messageId: MessageId, media: Media, adjustRect: Bool) -> (ASDisplayNode, CGRect, () -> (UIView?, UIView?))? {
+    override public func transitionNode(messageId: EngineMessage.Id, media: EngineRawMedia, adjustRect: Bool) -> (ASDisplayNode, CGRect, () -> (UIView?, UIView?))? {
         if self.item?.message.id == messageId, let currentMedia = self.media, currentMedia.isEqual(to: media) {
             let imageNode = self.imageNode
             return (self.imageNode, self.imageNode.bounds, { [weak imageNode] in
@@ -514,7 +514,7 @@ public class ChatMessageMapBubbleContentNode: ChatMessageBubbleContentNode {
         return nil
     }
     
-    override public func updateHiddenMedia(_ media: [Media]?) -> Bool {
+    override public func updateHiddenMedia(_ media: [EngineRawMedia]?) -> Bool {
         var mediaHidden = false
         if let currentMedia = self.media, let media = media {
             for item in media {

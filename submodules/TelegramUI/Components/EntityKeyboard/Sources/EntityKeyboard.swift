@@ -6,7 +6,6 @@ import ComponentFlow
 import PagerComponent
 import TelegramPresentationData
 import TelegramCore
-import Postbox
 import BundleIconComponent
 import AudioToolbox
 import SwiftSignalKit
@@ -273,7 +272,7 @@ public final class EntityKeyboardComponent: Component {
     public final class View: UIView {
         private let tintContainerView: UIView
         
-        private let pagerView: ComponentHostView<EntityKeyboardChildEnvironment>
+        private let pagerView: ComponentView<EntityKeyboardChildEnvironment>
         
         private var component: EntityKeyboardComponent?
         public private(set) weak var state: EmptyComponentState?
@@ -296,18 +295,30 @@ public final class EntityKeyboardComponent: Component {
         
         override init(frame: CGRect) {
             self.tintContainerView = UIView()
-            self.pagerView = ComponentHostView<EntityKeyboardChildEnvironment>()
+            self.pagerView = ComponentView()
             
             super.init(frame: frame)
             
             //self.clipsToBounds = true
             self.disablesInteractiveTransitionGestureRecognizer = true
-            
-            self.addSubview(self.pagerView)
         }
         
         required init?(coder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
+        }
+        
+        override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            if self.alpha.isZero {
+                return nil
+            }
+            for view in self.subviews.reversed() {
+                if let result = view.hitTest(self.convert(point, to: view), with: event), result.isUserInteractionEnabled {
+                    return result
+                }
+            }
+            
+            let result = super.hitTest(point, with: event)
+            return result
         }
         
         func update(component: EntityKeyboardComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
@@ -559,22 +570,14 @@ public final class EntityKeyboardComponent: Component {
             
             let emojiContentItemIdUpdated = ActionSlot<(AnyHashable, AnyHashable?, ComponentTransition)>()
             if let emojiContent = component.emojiContent {
-                let effectiveEmojiContent: EmojiPagerContentComponent
                 // MARK: Swiftgram
                 if SGSimpleSettings.shared.defaultEmojisFirst {
-                    effectiveEmojiContent = emojiContent.withUpdatedItemGroups(
-                        panelItemGroups: sgPatchEmojiKeyboardItems(emojiContent.panelItemGroups),
-                        contentItemGroups: sgPatchEmojiKeyboardItems(emojiContent.contentItemGroups),
-                        itemContentUniqueId: emojiContent.itemContentUniqueId,
-                        emptySearchResults: emojiContent.emptySearchResults,
-                        searchState: emojiContent.searchState
-                    )
-                } else {
-                    effectiveEmojiContent = emojiContent
+                    emojiContent.panelItemGroups = sgPatchEmojiKeyboardItems(emojiContent.panelItemGroups)
+                    emojiContent.contentItemGroups = sgPatchEmojiKeyboardItems(emojiContent.contentItemGroups)
                 }
-                contents.append(AnyComponentWithIdentity(id: "emoji", component: AnyComponent(effectiveEmojiContent)))
+                contents.append(AnyComponentWithIdentity(id: "emoji", component: AnyComponent(emojiContent)))
                 var topEmojiItems: [EntityKeyboardTopPanelComponent.Item] = []
-                for itemGroup in effectiveEmojiContent.panelItemGroups {
+                for itemGroup in emojiContent.panelItemGroups {
                     if !itemGroup.items.isEmpty {
                         if let id = itemGroup.groupId.base as? String, id != "peerSpecific" {
                             if id == "recent" || id == "liked" || id == "collectible" {
@@ -626,12 +629,12 @@ public final class EntityKeyboardComponent: Component {
                                     id: itemGroup.supergroupId,
                                     isReorderable: !itemGroup.isFeatured,
                                     content: AnyComponent(EntityKeyboardAnimationTopPanelComponent(
-                                        context: effectiveEmojiContent.context,
+                                        context: emojiContent.context,
                                         item: itemGroup.headerItem ?? animationData,
                                         isFeatured: itemGroup.isFeatured,
                                         isPremiumLocked: itemGroup.isPremiumLocked,
-                                        animationCache: effectiveEmojiContent.animationCache,
-                                        animationRenderer: effectiveEmojiContent.animationRenderer,
+                                        animationCache: emojiContent.animationCache,
+                                        animationRenderer: emojiContent.animationRenderer,
                                         theme: component.theme,
                                         title: itemGroup.title ?? "",
                                         customTintColor: component.customTintColor ?? itemGroup.customTintColor,
@@ -801,7 +804,12 @@ public final class EntityKeyboardComponent: Component {
                 forceUpdate: forceUpdate,
                 containerSize: availableSize
             )
-            transition.setFrame(view: self.pagerView, frame: CGRect(origin: CGPoint(), size: pagerSize))
+            if let pagerComponentView = self.pagerView.view {
+                if pagerComponentView.superview == nil {
+                    self.insertSubview(pagerComponentView, at: 0)
+                }
+                transition.setFrame(view: pagerComponentView, frame: CGRect(origin: CGPoint(), size: pagerSize))
+            }
             
             let accountContext = component.emojiContent?.context ?? component.stickerContent?.context
             if let searchComponent = self.searchComponent, let accountContext = accountContext {
@@ -1000,6 +1008,14 @@ public final class EntityKeyboardComponent: Component {
             
             pagerContentView.scrollToItemGroup(id: groupId, subgroupId: subgroupId, animated: animated)
             pagerView.collapseTopPanel()
+        }
+        
+        public func revealHiddenPanels() {
+            guard let pagerView = self.pagerView.findTaggedView(tag: PagerComponentViewTag()) as? PagerComponent<EntityKeyboardChildEnvironment, EntityKeyboardTopContainerPanelEnvironment>.View else {
+                return
+            }
+            
+            pagerView.revealHiddenPanels()
         }
         
         private func reorderPacks(category: ReorderCategory, items: [EntityKeyboardTopPanelComponent.Item]) {

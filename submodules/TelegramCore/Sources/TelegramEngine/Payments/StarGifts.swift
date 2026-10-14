@@ -479,28 +479,7 @@ public enum StarGift: Equatable, Codable, PostboxCoding {
                     return false
                 }
 
-                public var badgeText: String {
-                    switch self {
-                    case let .permille(value):
-                        if value == 0 {
-                            return "<0.1%"
-                        }
-                        let percent = Double(value) / 10.0
-                        if percent.truncatingRemainder(dividingBy: 1) == 0 {
-                            return "\(Int(percent))%"
-                        } else {
-                            return String(format: "%.1f%%", percent)
-                        }
-                    case .rare:
-                        return "rare"
-                    case .epic:
-                        return "epic"
-                    case .legendary:
-                        return "legendary"
-                    case .uncommon:
-                        return "uncommon"
-                    }
-                }
+                
             }
 
             case model(name: String, file: TelegramMediaFile, rarity: Rarity, crafted: Bool)
@@ -2393,8 +2372,22 @@ private final class ProfileGiftsContextImpl {
         self.pushState()
     }
     
-    func insertStarGifts(gifts: [ProfileGiftsContext.State.StarGift]) {
-        self.gifts.insert(contentsOf: gifts, at: 0)
+    func insertStarGifts(gifts: [ProfileGiftsContext.State.StarGift], afterPinned: Bool = false) {
+        if afterPinned {
+            var added = false
+            for index in 0 ..< self.gifts.count {
+                if !self.gifts[index].pinnedToTop {
+                    added = true
+                    self.gifts.insert(contentsOf: gifts, at: index)
+                    break
+                }
+            }
+            if !added {
+                self.gifts.append(contentsOf: gifts)
+            }
+        } else {
+            self.gifts.insert(contentsOf: gifts, at: 0)
+        }
         self.pushState()
         
         let peerId = self.peerId
@@ -2408,7 +2401,21 @@ private final class ProfileGiftsContextImpl {
             } else {
                 updatedGifts = []
             }
-            updatedGifts.insert(contentsOf: gifts, at: 0)
+            if afterPinned {
+                var added = false
+                for index in 0 ..< updatedGifts.count {
+                    if !updatedGifts[index].pinnedToTop {
+                        added = true
+                        updatedGifts.insert(contentsOf: gifts, at: index)
+                        break
+                    }
+                }
+                if !added {
+                    updatedGifts.append(contentsOf: gifts)
+                }
+            } else {
+                updatedGifts.insert(contentsOf: gifts, at: 0)
+            }
             updatedCount += Int32(gifts.count)
             if let entry = CodableEntry(CachedProfileGifts(gifts: updatedGifts, count: updatedCount, notificationsEnabled: nil)) {
                 transaction.putItemCacheEntry(id: giftsEntryId(peerId: peerId, collectionId: collectionId), entry: entry)
@@ -3108,9 +3115,9 @@ public final class ProfileGiftsContext {
         }
     }
     
-    public func insertStarGifts(gifts: [ProfileGiftsContext.State.StarGift]) {
+    public func insertStarGifts(gifts: [ProfileGiftsContext.State.StarGift], afterPinned: Bool = false) {
         self.impl.with { impl in
-            impl.insertStarGifts(gifts: gifts)
+            impl.insertStarGifts(gifts: gifts, afterPinned: afterPinned)
         }
     }
     
@@ -3911,6 +3918,7 @@ private final class ResaleGiftsContextImpl {
     
     private var sorting: ResaleGiftsContext.Sorting = .value
     private var filterAttributes: [ResaleGiftsContext.Attribute] = []
+    private var starsOnly = false
     
     private var gifts: [StarGift] = []
     private var attributes: [StarGift.UniqueGift.Attribute] = []
@@ -3956,6 +3964,7 @@ private final class ResaleGiftsContextImpl {
         let network = self.account.network
         let postbox = self.account.postbox
         let sorting = self.sorting
+        let starsOnly = self.starsOnly
         let filterAttributes = self.filterAttributes
         let currentAttributesHash = self.attributesHash
         
@@ -3979,6 +3988,10 @@ private final class ResaleGiftsContextImpl {
                 flags |= (1 << 1)
             case .number:
                 flags |= (1 << 2)
+            }
+            
+            if starsOnly {
+                flags |= (1 << 5)
             }
           
             var apiAttributes: [Api.StarGiftAttributeId]?
@@ -4111,6 +4124,17 @@ private final class ResaleGiftsContextImpl {
         self.loadMore()
     }
     
+    func updateStarsOnly(_ starsOnly: Bool) {
+        guard self.starsOnly != starsOnly else {
+            return
+        }
+        self.starsOnly = starsOnly
+        self.dataState = .ready(canLoadMore: true, nextOffset: nil)
+        self.pushState()
+        
+        self.loadMore()
+    }
+    
     func buyStarGift(slug: String, peerId: EnginePeer.Id, price: CurrencyAmount?) -> Signal<Never, BuyStarGiftError> {
         var listingPrice: CurrencyAmount?
         if let gift = self.gifts.first(where: { gift in
@@ -4185,6 +4209,7 @@ private final class ResaleGiftsContextImpl {
         let state = ResaleGiftsContext.State(
             sorting: self.sorting,
             filterAttributes: self.filterAttributes,
+            starsOnly: self.starsOnly,
             gifts: self.gifts,
             attributes: self.attributes,
             attributeCount: self.attributeCount,
@@ -4217,6 +4242,7 @@ public final class ResaleGiftsContext {
         
         public var sorting: Sorting
         public var filterAttributes: [Attribute]
+        public var starsOnly: Bool
         public var gifts: [StarGift]
         public var attributes: [StarGift.UniqueGift.Attribute]
         public var attributeCount: [Attribute: Int32]
@@ -4271,6 +4297,12 @@ public final class ResaleGiftsContext {
     public func updateFilterAttributes(_ attributes: [ResaleGiftsContext.Attribute]) {
         self.impl.with { impl in
             impl.updateFilterAttributes(attributes)
+        }
+    }
+    
+    public func updateStarsOnly(_ starsOnly: Bool) {
+        self.impl.with { impl in
+            impl.updateStarsOnly(starsOnly)
         }
     }
     

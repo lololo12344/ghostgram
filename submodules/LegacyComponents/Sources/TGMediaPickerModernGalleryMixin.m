@@ -84,7 +84,7 @@
         
         NSArray *galleryItems = [self prepareGalleryItemsForFetchResult:fetchResult selectionContext:selectionContext editingContext:editingContext stickersContext:stickersContext asFile:asFile enumerationBlock:enumerationBlock];
         
-        TGMediaPickerGalleryModel *model = [[TGMediaPickerGalleryModel alloc] initWithContext:[_windowManager context] items:galleryItems focusItem:focusItem selectionContext:selectionContext editingContext:editingContext hasCaptions:hasCaptions allowCaptionEntities:allowCaptionEntities hasTimer:hasTimer onlyCrop:onlyCrop inhibitDocumentCaptions:inhibitDocumentCaptions hasSelectionPanel:true hasCamera:false recipientName:recipientName isScheduledMessages:false hasCoverButton:hasCoverButton];
+        TGMediaPickerGalleryModel *model = [[TGMediaPickerGalleryModel alloc] initWithContext:[_windowManager context] items:galleryItems focusItem:focusItem selectionContext:selectionContext editingContext:editingContext hasCaptions:hasCaptions allowCaptionEntities:allowCaptionEntities hasTimer:hasTimer onlyCrop:onlyCrop inhibitDocumentCaptions:inhibitDocumentCaptions hasSelectionPanel:true hasCamera:false recipientName:recipientName isScheduledMessages:false canShowTelescope:false canSendTelescope:false hasCoverButton:hasCoverButton];
         _galleryModel = model;
         model.stickersContext = stickersContext;
         model.inhibitMute = inhibitMute;
@@ -142,7 +142,7 @@
                 strongSelf.completeWithItem(item, false, 0);
         };
         
-        model.interfaceView.doneLongPressed = ^(TGMediaPickerGalleryItem *item) {
+        model.interfaceView.doneLongPressed = ^(TGMediaPickerGalleryItem *item, UIView *sourceView) {
             __strong TGMediaPickerModernGalleryMixin *strongSelf = weakSelf;
             if (strongSelf == nil || !(hasSilentPosting || hasSchedule))
                 return;
@@ -201,7 +201,7 @@
                 if (strongSelf == nil)
                     return;
                 
-                strongSelf.presentScheduleController(true, ^(int32_t time) {
+                strongSelf.presentScheduleController(true, ^(int32_t time, bool silentPosting) {
                     __strong TGMediaPickerModernGalleryMixin *strongSelf = weakSelf;
                     if (strongSelf == nil)
                         return;
@@ -209,7 +209,7 @@
                     strongSelf->_galleryModel.dismiss(true, false);
                     
                     if (strongSelf.completeWithItem != nil)
-                        strongSelf.completeWithItem(item, false, time);
+                        strongSelf.completeWithItem(item, silentPosting, time);
                 });
             };
             controller.sendWithTimer = ^{
@@ -236,6 +236,19 @@
                         strongSelf.completeWithItem(item, false, 0);
                 });
             };
+            if (sourceView != nil && strongSelf->_stickersContext.presentMediaPickerSendActionMenu != nil && strongSelf->_stickersContext.presentMediaPickerSendActionMenu(sourceView, hasSilentPosting, effectiveHasSchedule, effectiveHasSchedule, reminder, false, ^{
+                if (controller.sendSilently != nil)
+                    controller.sendSilently();
+            }, ^{
+                if (controller.sendWhenOnline != nil)
+                    controller.sendWhenOnline();
+            }, ^{
+                if (controller.schedule != nil)
+                    controller.schedule();
+            }, ^{
+            })) {
+                return;
+            }
             
             TGOverlayControllerWindow *controllerWindow = [[TGOverlayControllerWindow alloc] initWithManager:[strongSelf->_context makeOverlayWindowManager] parentController:strongSelf->_parentController contentController:controller];
             controllerWindow.hidden = false;
@@ -369,32 +382,7 @@
         count = MIN(count, _itemsLimit);
     
     for (NSUInteger i = 0; i < count; i++)
-    {
-//        TGMediaAsset *asset = [fetchResult assetAtIndex:i];
-//
-//        TGMediaPickerGalleryItem<TGModernGallerySelectableItem, TGModernGalleryEditableItem> *galleryItem = nil;
-//        switch (asset.type)
-//        {
-//            case TGMediaAssetVideoType:
-//            {
-//                galleryItem = [[TGMediaPickerGalleryVideoItem alloc] initWithAsset:(id<TGMediaEditableItem,TGMediaSelectableItem>)asset];
-//            }
-//                break;
-//
-//            case TGMediaAssetGifType:
-//            {
-//                TGCameraCapturedVideo *convertedAsset = [[TGCameraCapturedVideo alloc] initWithAsset:asset livePhoto:false];
-//                galleryItem = [[TGMediaPickerGalleryVideoItem alloc] initWithAsset:convertedAsset];
-//            }
-//                break;
-//
-//            default:
-//            {
-//                galleryItem = [[TGMediaPickerGalleryPhotoItem alloc] initWithAsset:(id<TGMediaEditableItem,TGMediaSelectableItem>)asset];
-//            }
-//                break;
-//        }
-        
+    {        
         TGMediaPickerGalleryFetchResultItem *galleryItem = [[TGMediaPickerGalleryFetchResultItem alloc] initWithFetchResult:fetchResult index:i];
         galleryItem.selectionContext = selectionContext;
         galleryItem.editingContext = editingContext;
