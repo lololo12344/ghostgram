@@ -273,42 +273,25 @@ filegroup(
 )
 
 filegroup(
-    name = "AppIcons",
-    srcs = glob([
-        "Telegram-iOS/AppIcons.xcassets/**/*",
-    ], exclude = ["Telegram-iOS/AppIcons.xcassets/**/.*"]),
-)
-
-filegroup(
     name = "DefaultAppIcon",
     srcs = glob([
         "Telegram-iOS/DefaultAppIcon.xcassets/**/*",
     ], exclude = ["Telegram-iOS/DefaultAppIcon.xcassets/**/.*"]),
 )
 
-filegroup(
-    name = "DefaultIcon",
-    srcs = glob([
-        "Telegram-iOS/AppIcons.xcassets/BlueIcon.appiconset/*.png",
-    ]),
-)
-
+# MARK: Swiftgram alternative icons
 alternate_icon_folders = [
-    "BlackIcon",
-    "BlackClassicIcon",
-    "BlackFilledIcon",
-    "BlueIcon",
-    "BlueClassicIcon",
-    "BlueFilledIcon",
-    "WhiteFilledIcon",
-    "New1",
-    "New2",
-    "Premium",
-    "PremiumBlack",
-    "PremiumTurbo",
+    "SGDefault",
+    "SGBlack",
+    "SGLegacy",
+    "SGInverted",
+    "SGWhite",
+    "SGGold",
+    "SGDucky",
+    "SGDay"
 ]
 
-composer_icon_folders = ["Telegram"]
+composer_icon_folders = ["Swiftgram"]
 
 [
     filegroup(
@@ -1736,7 +1719,7 @@ ios_application(
         ":RequiredDeviceCapabilitiesPlist",
         ":UrlTypesInfoPlist",
     ],
-    app_icons = [":DefaultAppIcon"],
+    app_icons = [ ":{}_icon".format(name) for name in composer_icon_folders ],
     alternate_icons = [
         ":{}".format(name) for name in alternate_icon_folders
     ],
