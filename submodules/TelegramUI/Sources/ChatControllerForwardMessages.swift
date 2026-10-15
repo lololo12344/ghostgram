@@ -1,10 +1,10 @@
 import Foundation
+import Postbox
 import TelegramPresentationData
 import AccountContext
 import TelegramCore
 import SwiftSignalKit
 import Display
-import TelegramPresentationData
 import PresentationDataUtils
 import TextFormat
 import UndoUI
@@ -310,7 +310,7 @@ extension ChatControllerImpl {
                             }
                         }
                         
-                        switch strongSelf.buildForwardEnqueueMessages(from: messages, options: forwardOptions, threadId: nil) {
+                        switch strongSelf.buildForwardEnqueueMessages(from: messages, options: forwardOptions, threadId: nil as Int64?) {
                         case let .messages(forwardMessages):
                             result.append(contentsOf: forwardMessages)
                         case .unsupported:
@@ -551,7 +551,7 @@ extension ChatControllerImpl {
                     
                     var correlationIds: [Int64] = []
                     let mappedMessages: [EnqueueMessage]
-                    switch strongSelf.buildForwardEnqueueMessages(from: messages, options: options, threadId: nil) {
+                    switch strongSelf.buildForwardEnqueueMessages(from: messages, options: options, threadId: nil as Int64?) {
                     case let .messages(builtMessages):
                         mappedMessages = builtMessages.map { message in
                             let correlationId = Int64.random(in: Int64.min ... Int64.max)
