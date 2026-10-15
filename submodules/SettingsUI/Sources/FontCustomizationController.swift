@@ -896,7 +896,7 @@ private func fontCustomizationEntries(
 public func fontCustomizationController(context: AccountContext) -> ViewController {
     let manager = FontCustomizationManager.shared
     var pushControllerImpl: ((ViewController, Bool) -> Void)?
-    var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
+    var presentControllerImpl: ((ViewController, Any?) -> Void)?
 
     let stateValue = Atomic(value: FontCustomizationState.current())
     let statePromise = ValuePromise(stateValue.with { $0 }, ignoreRepeated: true)
@@ -1074,7 +1074,7 @@ public func fontCustomizationController(context: AccountContext) -> ViewControll
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, FontCustomizationArguments)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let entries = fontCustomizationEntries(presentationData: presentationData, state: state)
 
         let controllerState = ItemListControllerState(
@@ -1106,8 +1106,8 @@ public func fontCustomizationController(context: AccountContext) -> ViewControll
     pushControllerImpl = { [weak controller] c, animated in
         controller?.push(c)
     }
-    presentControllerImpl = { [weak controller] c, a in
-        controller?.present(c, in: .window(.root), with: a)
+    presentControllerImpl = { [weak controller] c, _ in
+        controller?.present(c, in: .window(.root))
     }
     return controller
 }

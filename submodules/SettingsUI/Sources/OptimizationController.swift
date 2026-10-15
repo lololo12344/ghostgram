@@ -6,6 +6,8 @@ import TelegramCore
 import TelegramPresentationData
 import ItemListUI
 import AccountContext
+import AlertUI
+import OverlayStatusController
 
 private enum OptimizationSection: Int32 {
     case performance
@@ -227,7 +229,7 @@ public func optimizationController(context: AccountContext) -> ViewController {
         statePromise.set(updated)
     }
 
-    var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
+    var presentControllerImpl: ((ViewController, Any?) -> Void)?
 
     let speeds = ["1.0x (Обычная)", "1.5x (Быстрая)", "2.0x (Максимальная)", "0x (Без анимаций)"]
 
@@ -258,28 +260,19 @@ public func optimizationController(context: AccountContext) -> ViewController {
                     try? fm.removeItem(atPath: p)
                 }
             }
-            let alert = textAlertController(
-                context: context,
-                title: "Успешно",
-                text: "Временные файлы очищены.",
-                actions: [TextAlertAction(type: .defaultAction, title: "OK", action: {})]
-            )
-            presentControllerImpl?(alert, nil)
+            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+            presentControllerImpl?(OverlayStatusController(theme: presentationData.theme, type: .success), nil)
         },
         clearDatabaseCache: {
-            let alert = textAlertController(
-                context: context,
+            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+            let alert = standardTextAlertController(
+                theme: presentationData.theme,
                 title: "Очистить кэш?",
                 text: "Будет очищен кэш превью и миниатюр. Все медиафайлы останутся в облаке.",
                 actions: [
                     TextAlertAction(type: .destructiveAction, title: "Очистить", action: {
-                        let alertDone = textAlertController(
-                            context: context,
-                            title: "Готово",
-                            text: "Кэш миниатюр успешно сброшен.",
-                            actions: [TextAlertAction(type: .defaultAction, title: "OK", action: {})]
-                        )
-                        presentControllerImpl?(alertDone, nil)
+                        let pData = context.sharedContext.currentPresentationData.with { $0 }
+                        presentControllerImpl?(OverlayStatusController(theme: pData.theme, type: .success), nil)
                     }),
                     TextAlertAction(type: .genericAction, title: "Отмена", action: {})
                 ]
@@ -296,7 +289,7 @@ public func optimizationController(context: AccountContext) -> ViewController {
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, OptimizationArguments)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let entries = optimizationEntries(presentationData: presentationData, state: state)
 
         let controllerState = ItemListControllerState(
@@ -319,8 +312,8 @@ public func optimizationController(context: AccountContext) -> ViewController {
     }
 
     let controller = ItemListController(context: context, state: signal)
-    presentControllerImpl = { [weak controller] c, a in
-        controller?.present(c, in: .window(.root), with: a)
+    presentControllerImpl = { [weak controller] c, _ in
+        controller?.present(c, in: .window(.root))
     }
     return controller
 }

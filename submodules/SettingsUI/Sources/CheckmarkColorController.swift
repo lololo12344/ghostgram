@@ -258,21 +258,32 @@ public func checkmarkColorController(context: AccountContext) -> ViewController 
             updateState { $0.mode = mode }
         },
         editCustomHex: {
-            let alert = textAlertController(
-                context: context,
-                title: "Пользовательский цвет",
-                text: "Введите цвет в формате #RRGGBB:",
-                values: [
-                    TextAlertAction(type: .defaultAction, title: "Готово", action: { [weak statePromise] values in
-                        if let hex = values?.first, !hex.isEmpty {
-                            manager.readStatusCustomColor = hex
-                            updateState { $0.customHex = hex }
-                        }
-                    }),
-                    TextAlertAction(type: .genericAction, title: "Отмена", action: {})
-                ]
-            )
-            presentControllerImpl?(alert, nil)
+            let actionSheet = ActionSheetController(presentationData: context.sharedContext.currentPresentationData.with { $0 })
+            let colors: [(String, String)] = [
+                ("#FF2D55", "Ярко-розовый"),
+                ("#5856D6", "Индиго"),
+                ("#AF52DE", "Пурпурный"),
+                ("#007AFF", "Синий"),
+                ("#34C759", "Изумрудный"),
+                ("#FF9500", "Оранжевый"),
+                ("#FFCC00", "Желтый"),
+                ("#5AC8FA", "Бирюзовый"),
+                ("#FFFFFF", "Белый"),
+                ("#000000", "Черный")
+            ]
+            var items: [ActionSheetItem] = []
+            for (hex, name) in colors {
+                items.append(ActionSheetButtonItem(title: "\(name) (\(hex))", color: .accent, action: { [weak actionSheet] in
+                    actionSheet?.dismissAnimated()
+                    manager.readStatusCustomColor = hex
+                    updateState { $0.customHex = hex }
+                }))
+            }
+            items.append(ActionSheetButtonItem(title: "Отмена", color: .destructive, action: { [weak actionSheet] in
+                actionSheet?.dismissAnimated()
+            }))
+            actionSheet.setItemGroups([ActionSheetItemGroup(items: items)])
+            presentControllerImpl?(actionSheet, nil)
         },
         selectPreset: { hex in
             manager.readStatusCustomColor = hex
@@ -284,7 +295,7 @@ public func checkmarkColorController(context: AccountContext) -> ViewController 
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, CheckmarkColorArguments)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let entries = checkmarkColorEntries(presentationData: presentationData, state: state)
 
         let controllerState = ItemListControllerState(
@@ -307,8 +318,8 @@ public func checkmarkColorController(context: AccountContext) -> ViewController 
     }
 
     let controller = ItemListController(context: context, state: signal)
-    presentControllerImpl = { [weak controller] c, a in
-        controller?.present(c, in: .window(.root), with: a)
+    presentControllerImpl = { [weak controller] c, _ in
+        controller?.present(c, in: .window(.root))
     }
     return controller
 }
