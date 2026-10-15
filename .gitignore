@@ -90,3 +90,8 @@ xcode-files
 **/node_modules/
 tools/sim-watcher/dist/
 .mcp.json
+ci_failure.log
+check_ci.py
+get_failure_log.py
+monitor_build.py
+ru_strings.json

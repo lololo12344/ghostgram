@@ -379,6 +379,30 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                                 case "SGDefault":
                                     name = item.strings.Appearance_AppIconDefault
                                     bordered = false
+                                case "Ghost":
+                                    name = "Ghost"
+                                    bordered = false
+                                case "GLEGramBlack":
+                                    name = "Black"
+                                    bordered = false
+                                case "GLEGramDarkPurple":
+                                    name = "Dark"
+                                    bordered = false
+                                case "GLEGramDuck":
+                                    name = "Duck"
+                                    bordered = false
+                                case "GLEGramGreen":
+                                    name = "Green"
+                                    bordered = false
+                                case "GLEGramPink":
+                                    name = "Pink"
+                                    bordered = false
+                                case "GLEGramPurple":
+                                    name = "Purple"
+                                    bordered = false
+                                case "GLEGramRed":
+                                    name = "Red"
+                                    bordered = false
                                 case "SGBlack":
                                     name = "Black"
                                     bordered = false

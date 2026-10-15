@@ -1003,9 +1003,17 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 icons.append(PresentationAppIcon(name: "PremiumBlack", imageName: "PremiumBlack", isPremium: true))
                 
                 
-                // MARK: Swiftgram
+                // MARK: Swiftgram & Ghostgram
                 icons = [
                     PresentationAppIcon(name: "SGDefault", imageName: "SGDefault", isDefault: true),
+                    PresentationAppIcon(name: "Ghost", imageName: "Ghost"),
+                    PresentationAppIcon(name: "GLEGramBlack", imageName: "GLEGramBlack"),
+                    PresentationAppIcon(name: "GLEGramDarkPurple", imageName: "GLEGramDarkPurple"),
+                    PresentationAppIcon(name: "GLEGramDuck", imageName: "GLEGramDuck"),
+                    PresentationAppIcon(name: "GLEGramGreen", imageName: "GLEGramGreen"),
+                    PresentationAppIcon(name: "GLEGramPink", imageName: "GLEGramPink"),
+                    PresentationAppIcon(name: "GLEGramPurple", imageName: "GLEGramPurple"),
+                    PresentationAppIcon(name: "GLEGramRed", imageName: "GLEGramRed"),
                     PresentationAppIcon(name: "SGBlack", imageName: "SGBlack"),
                     PresentationAppIcon(name: "SGLegacy", imageName: "SGLegacy"),
                     PresentationAppIcon(name: "SGInverted", imageName: "SGInverted"),

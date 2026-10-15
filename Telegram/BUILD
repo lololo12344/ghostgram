@@ -279,8 +279,16 @@ filegroup(
     ], exclude = ["Telegram-iOS/DefaultAppIcon.xcassets/**/.*"]),
 )
 
-# MARK: Swiftgram alternative icons
+# MARK: Ghostgram & Swiftgram alternative icons
 alternate_icon_folders = [
+    "GLEGramBlack",
+    "GLEGramDarkPurple",
+    "GLEGramDuck",
+    "GLEGramGreen",
+    "GLEGramPink",
+    "GLEGramPurple",
+    "GLEGramRed",
+    "Ghost",
     "SGDefault",
     "SGBlack",
     "SGLegacy",

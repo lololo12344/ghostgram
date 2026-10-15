@@ -320,7 +320,6 @@ public func ghostgramSettingsController(context: AccountContext) -> ViewControll
     let controller = ItemListController(context: context, state: signal)
     
     // Refresh state when view appears
-    controller.visibleBottomContentOffsetChanged = { _ in }
     controller.didAppear = { (_: Bool) in
         let newState = GhostgramSettingsState.current()
         let _ = stateValue.modify { _ in newState }
