@@ -1,4 +1,43 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load(
+    "@build_bazel_rules_apple//apple:resources.bzl",
+    "apple_resource_bundle",
+)
+load("//build-system/bazel-utils:plist_fragment.bzl",
+    "plist_fragment",
+)
+
+filegroup(
+    name = "SettingsUIBundleFiles",
+    srcs = glob([
+        "Resources/SettingsUIBundle/**/*",
+    ], exclude = ["Resources/SettingsUIBundle/**/.*"]),
+    visibility = ["//visibility:public"],
+)
+
+plist_fragment(
+    name = "SettingsUIBundleInfoPlist",
+    extension = "plist",
+    template =
+    """
+    <key>CFBundleIdentifier</key>
+    <string>org.ghostgram.SettingsUIBundle</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleName</key>
+    <string>SettingsUIBundle</string>
+    """
+)
+
+apple_resource_bundle(
+    name = "SettingsUIBundle",
+    infoplists = [
+        ":SettingsUIBundleInfoPlist",
+    ],
+    resources = [
+        ":SettingsUIBundleFiles",
+    ],
+)
 
 sgdeps = [
     "//submodules/BuildConfig:BuildConfig",
@@ -18,6 +57,9 @@ swift_library(
     ]),
     copts = [
         "-warnings-as-errors",
+    ],
+    data = [
+        ":SettingsUIBundle",
     ],
     deps = sgdeps + [
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
