@@ -1621,6 +1621,18 @@ plist_fragment(
         <string>SFCompactRounded-Semibold.otf</string>
         <string>AremacFS-Regular.otf</string>
         <string>AremacFS-Semibold.otf</string>
+        <string>SourceSansPro-Regular.otf</string>
+        <string>SourceSansPro-Bold.otf</string>
+        <string>SourceCodePro-Regular.otf</string>
+        <string>SourceCodePro-Bold.otf</string>
+        <string>SourceSerifPro-Regular.otf</string>
+        <string>SourceSerifPro-Bold.otf</string>
+        <string>WorkSans-Regular.otf</string>
+        <string>WorkSans-Bold.otf</string>
+        <string>NanumSquareRoundR.ttf</string>
+        <string>NanumSquareRoundB.ttf</string>
+        <string>mononoki-Regular.ttf</string>
+        <string>mononoki-Bold.ttf</string>
     </array>
     <key>UIBackgroundModes</key>
     <array>
