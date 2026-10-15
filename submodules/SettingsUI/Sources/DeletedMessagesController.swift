@@ -272,7 +272,7 @@ public func deletedMessagesController(context: AccountContext) -> ViewController
     }
     
     let controller = ItemListController(context: context, state: signal)
-    controller.didAppear = { _ in
+    controller.didAppear = { (_: Bool) in
         updateState { state in
             var state = state
             state.isEnabled = AntiDeleteManager.shared.isEnabled
@@ -513,7 +513,7 @@ private func deletedMessagesHistoryController(context: AccountContext) -> ViewCo
     }
     
     let controller = ItemListController(context: context, state: signal)
-    controller.didAppear = { _ in
+    controller.didAppear = { (_: Bool) in
         updateState { state in
             var state = state
             state.messages = AntiDeleteManager.shared.getAllArchivedMessages()

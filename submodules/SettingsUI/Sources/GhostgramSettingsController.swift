@@ -321,7 +321,7 @@ public func ghostgramSettingsController(context: AccountContext) -> ViewControll
     
     // Refresh state when view appears
     controller.visibleBottomContentOffsetChanged = { _ in }
-    controller.didAppear = { _ in
+    controller.didAppear = { (_: Bool) in
         let newState = GhostgramSettingsState.current()
         let _ = stateValue.modify { _ in newState }
         statePromise.set(newState)
