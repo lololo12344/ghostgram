@@ -24,7 +24,6 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
     case toolsHeader(PresentationTheme, String)
     case voiceMorpher(PresentationTheme, String, String)
     case deviceSpoof(PresentationTheme, String, String)
-    case sendDelay(PresentationTheme, String, String)
     
     case info(PresentationTheme, String)
     
@@ -32,7 +31,7 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
         switch self {
         case .privacyHeader, .ghostMode, .deletedMessages, .misc:
             return GhostgramSettingsSection.privacy.rawValue
-        case .toolsHeader, .voiceMorpher, .deviceSpoof, .sendDelay:
+        case .toolsHeader, .voiceMorpher, .deviceSpoof:
             return GhostgramSettingsSection.tools.rawValue
         case .info:
             return GhostgramSettingsSection.info.rawValue
@@ -48,8 +47,7 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
         case .toolsHeader: return 4
         case .voiceMorpher: return 5
         case .deviceSpoof: return 6
-        case .sendDelay: return 7
-        case .info: return 8
+        case .info: return 7
         }
     }
     
@@ -75,9 +73,6 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
             return false
         case let .deviceSpoof(lhsTheme, lhsText, lhsValue):
             if case let .deviceSpoof(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
-            return false
-        case let .sendDelay(lhsTheme, lhsText, lhsValue):
-            if case let .sendDelay(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue { return true }
             return false
         case let .info(lhsTheme, lhsText):
             if case let .info(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText { return true }
@@ -151,17 +146,6 @@ private enum GhostgramSettingsEntry: ItemListNodeEntry {
                     arguments.openDeviceSpoof()
                 }
             )
-        case let .sendDelay(_, text, value):
-            return ItemListDisclosureItem(
-                presentationData: presentationData,
-                title: text,
-                label: value,
-                sectionId: self.section,
-                style: .blocks,
-                action: {
-                    arguments.openSendDelay()
-                }
-            )
         case let .info(_, text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         }
@@ -176,22 +160,19 @@ private final class GhostgramSettingsControllerArguments {
     let openMisc: () -> Void
     let openDeviceSpoof: () -> Void
     let openVoiceMorpher: () -> Void
-    let openSendDelay: () -> Void
     
     init(
         openDeletedMessages: @escaping () -> Void,
         openGhostMode: @escaping () -> Void,
         openMisc: @escaping () -> Void,
         openDeviceSpoof: @escaping () -> Void,
-        openVoiceMorpher: @escaping () -> Void,
-        openSendDelay: @escaping () -> Void
+        openVoiceMorpher: @escaping () -> Void
     ) {
         self.openDeletedMessages = openDeletedMessages
         self.openGhostMode = openGhostMode
         self.openMisc = openMisc
         self.openDeviceSpoof = openDeviceSpoof
         self.openVoiceMorpher = openVoiceMorpher
-        self.openSendDelay = openSendDelay
     }
 }
 
@@ -206,7 +187,6 @@ private struct GhostgramSettingsState: Equatable {
     var deviceSpoofEnabled: Bool
     var voiceMorpherEnabled: Bool
     var voiceMorpherPresetName: String
-    var sendDelayEnabled: Bool
     
     static func current() -> GhostgramSettingsState {
         return GhostgramSettingsState(
@@ -217,8 +197,7 @@ private struct GhostgramSettingsState: Equatable {
             miscActiveCount: MiscSettingsManager.shared.activeFeatureCount,
             deviceSpoofEnabled: DeviceSpoofManager.shared.isEnabled,
             voiceMorpherEnabled: VoiceMorpherManager.shared.isEnabled,
-            voiceMorpherPresetName: VoiceMorpherManager.shared.selectedPreset.name,
-            sendDelayEnabled: SendDelayManager.shared.isEnabled
+            voiceMorpherPresetName: VoiceMorpherManager.shared.selectedPreset.name
         )
     }
 }
@@ -253,9 +232,6 @@ private func ghostgramSettingsControllerEntries(
     let deviceSpoofStatus = state.deviceSpoofEnabled ? "Вкл" : "Выкл"
     entries.append(.deviceSpoof(theme, "Подмена устройства", deviceSpoofStatus))
     
-    let sendDelayStatus = state.sendDelayEnabled ? "Вкл" : "Выкл"
-    entries.append(.sendDelay(theme, "Задержка отправки", sendDelayStatus))
-    
     // Info
     entries.append(.info(theme, "Ghostgram • Локальные функции конфиденциальности. Все настройки применяются исключительно на вашем устройстве."))
     
@@ -285,9 +261,6 @@ public func ghostgramSettingsController(context: AccountContext) -> ViewControll
         },
         openVoiceMorpher: {
             pushControllerImpl?(voiceMorpherController(context: context), true)
-        },
-        openSendDelay: {
-            pushControllerImpl?(sendDelayController(context: context), true)
         }
     )
     
@@ -295,7 +268,7 @@ public func ghostgramSettingsController(context: AccountContext) -> ViewControll
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, GhostgramSettingsControllerArguments)) in
         let entries = ghostgramSettingsControllerEntries(presentationData: presentationData, state: state)
         
         let controllerState = ItemListControllerState(
