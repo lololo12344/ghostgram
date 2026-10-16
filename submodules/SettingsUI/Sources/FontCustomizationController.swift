@@ -5,6 +5,8 @@ import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
 import ItemListUI
+import PresentationDataUtils
+import AlertUI
 import AccountContext
 
 private enum FontCustomizationSection: Int32 {
@@ -1074,7 +1076,7 @@ public func fontCustomizationController(context: AccountContext) -> ViewControll
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, FontCustomizationArguments)) in
         let entries = fontCustomizationEntries(presentationData: presentationData, state: state)
 
         let controllerState = ItemListControllerState(
@@ -1106,8 +1108,8 @@ public func fontCustomizationController(context: AccountContext) -> ViewControll
     pushControllerImpl = { [weak controller] c, animated in
         controller?.push(c)
     }
-    presentControllerImpl = { [weak controller] c, _ in
-        controller?.present(c, in: .window(.root))
+    presentControllerImpl = { [weak controller] c, presentationArguments in
+        controller?.present(c, in: .window(.root), with: presentationArguments)
     }
     return controller
 }

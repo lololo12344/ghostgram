@@ -5,6 +5,8 @@ import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
 import ItemListUI
+import PresentationDataUtils
+import AlertUI
 import AccountContext
 
 private enum CheckmarkColorSection: Int32 {
@@ -295,7 +297,7 @@ public func checkmarkColorController(context: AccountContext) -> ViewController 
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, CheckmarkColorArguments)) in
         let entries = checkmarkColorEntries(presentationData: presentationData, state: state)
 
         let controllerState = ItemListControllerState(
@@ -318,8 +320,8 @@ public func checkmarkColorController(context: AccountContext) -> ViewController 
     }
 
     let controller = ItemListController(context: context, state: signal)
-    presentControllerImpl = { [weak controller] c, _ in
-        controller?.present(c, in: .window(.root))
+    presentControllerImpl = { [weak controller] c, presentationArguments in
+        controller?.present(c, in: .window(.root), with: presentationArguments)
     }
     return controller
 }

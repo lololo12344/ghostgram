@@ -5,6 +5,7 @@ import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
 import ItemListUI
+import PresentationDataUtils
 import AccountContext
 import AlertUI
 import OverlayStatusController
@@ -229,7 +230,7 @@ public func optimizationController(context: AccountContext) -> ViewController {
         statePromise.set(updated)
     }
 
-    var presentControllerImpl: ((ViewController, Any?) -> Void)?
+    var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
 
     let speeds = ["1.0x (Обычная)", "1.5x (Быстрая)", "2.0x (Максимальная)", "0x (Без анимаций)"]
 
@@ -264,9 +265,8 @@ public func optimizationController(context: AccountContext) -> ViewController {
             presentControllerImpl?(OverlayStatusController(theme: presentationData.theme, type: .success), nil)
         },
         clearDatabaseCache: {
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            let alert = standardTextAlertController(
-                theme: presentationData.theme,
+            let alert = textAlertController(
+                context: context,
                 title: "Очистить кэш?",
                 text: "Будет очищен кэш превью и миниатюр. Все медиафайлы останутся в облаке.",
                 actions: [
@@ -289,7 +289,7 @@ public func optimizationController(context: AccountContext) -> ViewController {
         context.sharedContext.presentationData,
         statePromise.get()
     )
-    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, state -> (ItemListControllerState, (ItemListNodeState, OptimizationArguments)) in
         let entries = optimizationEntries(presentationData: presentationData, state: state)
 
         let controllerState = ItemListControllerState(
@@ -312,8 +312,8 @@ public func optimizationController(context: AccountContext) -> ViewController {
     }
 
     let controller = ItemListController(context: context, state: signal)
-    presentControllerImpl = { [weak controller] c, _ in
-        controller?.present(c, in: .window(.root))
+    presentControllerImpl = { [weak controller] c, presentationArguments in
+        controller?.present(c, in: .window(.root), with: presentationArguments)
     }
     return controller
 }

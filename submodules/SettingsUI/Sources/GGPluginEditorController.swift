@@ -5,6 +5,8 @@ import AsyncDisplayKit
 @preconcurrency import WebKit
 import TelegramPresentationData
 import AccountContext
+import PresentationDataUtils
+import AlertUI
 
 private final class GGPluginWeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
     private let handler: (WKScriptMessage) -> Void
