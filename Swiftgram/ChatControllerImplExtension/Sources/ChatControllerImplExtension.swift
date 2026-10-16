@@ -143,11 +143,6 @@ extension ChatControllerImpl {
                 return lhs.id < rhs.id
             }
             
-            var attributes: [MessageAttribute] = []
-            if removeNames {
-                attributes.append(ForwardOptionsMessageAttribute(hideNames: true, hideCaptions: false))
-            }
-            
             if !openCloud {
                 Queue.mainQueue().after(0.88) {
                     strongSelf.chatDisplayNode.hapticFeedback.success()
@@ -170,9 +165,17 @@ extension ChatControllerImpl {
                 }), in: .current)
             }
 
-            let _ = (enqueueMessages(account: strongSelf.context.account, peerId: strongSelf.context.account.peerId, messages: sortedMessages.map { message -> EnqueueMessage in
-                return .forward(source: message.id, threadId: nil, grouping: .auto, attributes: attributes, correlationId: nil)
-            })
+            let forwardOptions = ChatInterfaceForwardOptionsState(hideNames: removeNames, hideCaptions: false, unhideNamesOnCaptionChange: false)
+            let mappedMessages: [EnqueueMessage]
+            switch strongSelf.buildForwardEnqueueMessages(from: sortedMessages, options: forwardOptions, threadId: nil) {
+            case let .messages(builtMessages):
+                mappedMessages = builtMessages
+            case .unsupported:
+                strongSelf.presentUnsupportedProtectedForwardAlert(in: nil)
+                return
+            }
+
+            let _ = (enqueueMessages(account: strongSelf.context.account, peerId: strongSelf.context.account.peerId, messages: mappedMessages)
             |> deliverOnMainQueue).startStandalone(next: { messageIds in
                 guard openCloud else {
                     return

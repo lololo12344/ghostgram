@@ -30,7 +30,56 @@ extension ChatControllerImpl {
     }
     
     private func shouldUsePlainCopyForward(for message: Message) -> Bool {
-        return MiscSettingsManager.shared.shouldBypassCopyProtection && message.isCopyProtectedIgnoringBypass()
+        guard MiscSettingsManager.shared.shouldBypassCopyProtection else {
+            return false
+        }
+        if message.isCopyProtectedIgnoringBypass() {
+            return true
+        }
+        if self.presentationInterfaceState.copyProtectionEnabled {
+            return true
+        }
+        if let peer = message.peers[message.id.peerId] {
+            if let channel = peer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+            if let group = peer as? TelegramGroup, group.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+        }
+        if let peer = self.chatLocation.peerId.flatMap({ message.peers[$0] }) {
+            if let channel = peer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+            if let group = peer as? TelegramGroup, group.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+        }
+        if let peer = self.presentationInterfaceState.renderedPeer?.peer {
+            if let channel = peer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+            if let group = peer as? TelegramGroup, group.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+        }
+        if let sourcePeer = message.forwardInfo?.source {
+            if let channel = sourcePeer as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+            if let group = sourcePeer as? TelegramGroup, group.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+        }
+        if let author = message.forwardInfo?.author {
+            if let channel = author as? TelegramChannel, channel.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+            if let group = author as? TelegramGroup, group.flags.contains(.copyProtectionEnabled) {
+                return true
+            }
+        }
+        return false
     }
     
     private func forwardMessagesNeedPlainCopy(_ messages: [Message]) -> Bool {
@@ -42,8 +91,13 @@ extension ChatControllerImpl {
         
         for media in message.media {
             switch media {
-            case is TelegramMediaAction, is TelegramMediaPoll, is TelegramMediaTodo, is TelegramMediaDice, is TelegramMediaPaidContent, is TelegramMediaExpiredContent, is TelegramMediaStory, is TelegramMediaInvoice:
+            case is TelegramMediaAction, is TelegramMediaDice, is TelegramMediaPaidContent, is TelegramMediaExpiredContent, is TelegramMediaInvoice:
                 return nil
+            case is TelegramMediaPoll, is TelegramMediaStory, is TelegramMediaTodo:
+                if supportedMedia != nil {
+                    return nil
+                }
+                supportedMedia = media
             case is TelegramMediaWebpage:
                 continue
             case is TelegramMediaImage, is TelegramMediaFile:
@@ -81,8 +135,9 @@ extension ChatControllerImpl {
             return nil
         }
         
+        let isOnlyWebpage = !message.media.isEmpty && message.media.allSatisfy { $0 is TelegramMediaWebpage }
         let mediaReference = self.plainCopyForwardMediaReference(for: message)
-        if !message.media.isEmpty && mediaReference == nil {
+        if !message.media.isEmpty && !isOnlyWebpage && mediaReference == nil {
             return nil
         }
         
@@ -533,6 +588,32 @@ extension ChatControllerImpl {
                 }
                 
                 if case .peer(peerId) = strongSelf.chatLocation, strongSelf.parentController == nil, !isPinnedMessages {
+                    if strongSelf.forwardMessagesNeedPlainCopy(messages) {
+                        let forwardOptions = options ?? ChatInterfaceForwardOptionsState(hideNames: !hasNotOwnMessages, hideCaptions: false, unhideNamesOnCaptionChange: false)
+                        let mappedMessages: [EnqueueMessage]
+                        switch strongSelf.buildForwardEnqueueMessages(from: messages, options: forwardOptions, threadId: nil) {
+                        case let .messages(builtMessages):
+                            mappedMessages = builtMessages
+                        case .unsupported:
+                            strongSelf.presentUnsupportedProtectedForwardAlert(in: strongController)
+                            return
+                        }
+                        
+                        let _ = (enqueueMessages(account: strongSelf.context.account, peerId: peerId, messages: mappedMessages)
+                        |> deliverOnMainQueue).startStandalone()
+                        
+                        let presentationData = strongSelf.context.sharedContext.currentPresentationData.with { $0 }
+                        var peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
+                        peerName = peerName.replacingOccurrences(of: "**", with: "")
+                        let text = messages.count == 1 ? presentationData.strings.Conversation_ForwardTooltip_Chat_One(peerName).string : presentationData.strings.Conversation_ForwardTooltip_Chat_Many(peerName).string
+                        strongSelf.present(UndoOverlayController(presentationData: presentationData, content: .forward(savedMessages: false, text: text), elevatedLayout: false, position: .bottom, animateInAsReplacement: true, action: { _ in
+                            return false
+                        }), in: .current)
+                        
+                        strongSelf.updateChatPresentationInterfaceState(animated: false, interactive: true, { $0.updatedInterfaceState({ $0.withoutSelectionState() }) })
+                        strongController.dismiss()
+                        return
+                    }
                     strongSelf.updateChatPresentationInterfaceState(animated: false, interactive: true, { $0.updatedInterfaceState({ $0.withUpdatedForwardMessageIds(messages.map { $0.id }).withUpdatedForwardOptionsState(ChatInterfaceForwardOptionsState(hideNames: !hasNotOwnMessages || (options?.hideNames ?? false), hideCaptions: false, unhideNamesOnCaptionChange: false)).withoutSelectionState() }).updatedSearch(nil) })
                     strongSelf.updateItemNodesSearchTextHighlightStates()
                     strongSelf.searchResultsController = nil

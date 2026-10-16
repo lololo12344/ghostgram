@@ -1270,7 +1270,7 @@ final class StoryItemSetContainerSendMessage: @unchecked(Sendable) {
             return
         }
 
-        if focusedItem.storyItem.isForwardingDisabled {
+        if focusedItem.storyItem.isForwardingDisabled && !MiscSettingsManager.shared.shouldBypassCopyProtection {
             let presentationData = component.context.sharedContext.currentPresentationData.with({ $0 }).withUpdated(theme: component.theme)
             let actionSheet = ActionSheetController(presentationData: presentationData)
 

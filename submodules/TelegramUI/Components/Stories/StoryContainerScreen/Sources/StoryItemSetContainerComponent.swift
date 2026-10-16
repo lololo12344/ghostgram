@@ -1795,7 +1795,7 @@ public final class StoryItemSetContainerComponent: Component {
                         if case .liveStream = component.slice.item.storyItem.media {
                             displayFooter = false
                         }
-                        if component.slice.item.storyItem.isForwardingDisabled {
+                        if component.slice.item.storyItem.isForwardingDisabled && !MiscSettingsManager.shared.shouldBypassCopyProtection {
                             canShare = false
                         }
                         
@@ -3238,7 +3238,7 @@ public final class StoryItemSetContainerComponent: Component {
                             }
                         },
                         timeoutAction: nil,
-                        forwardAction: (!isLiveStream && component.slice.item.storyItem.isPublic && !component.slice.item.storyItem.isForwardingDisabled) ? { [weak self] in
+                        forwardAction: (!isLiveStream && (component.slice.item.storyItem.isPublic || MiscSettingsManager.shared.shouldBypassCopyProtection) && (!component.slice.item.storyItem.isForwardingDisabled || MiscSettingsManager.shared.shouldBypassCopyProtection)) ? { [weak self] in
                             guard let self else {
                                 return
                             }
@@ -7308,7 +7308,7 @@ public final class StoryItemSetContainerComponent: Component {
                             if isHq {
                                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/QualitySd"), color: theme.contextMenu.primaryColor)
                             } else {
-                                return generateTintedImage(image: UIImage(bundleImageName: accountUser.isPremium ? "Chat/Context Menu/QualityHd" : "Chat/Context Menu/QualityHdLocked"), color: theme.contextMenu.primaryColor)
+                                return generateTintedImage(image: UIImage(bundleImageName: (accountUser.isPremium || MiscSettingsManager.shared.shouldBypassCopyProtection) ? "Chat/Context Menu/QualityHd" : "Chat/Context Menu/QualityHdLocked"), color: theme.contextMenu.primaryColor)
                             }
                         }, action: { [weak self] _, a in
                             a(.default)
@@ -7317,7 +7317,7 @@ public final class StoryItemSetContainerComponent: Component {
                                 return
                             }
                             
-                            if !component.slice.additionalPeerData.preferHighQualityStories && !accountUser.isPremium {
+                            if !component.slice.additionalPeerData.preferHighQualityStories && !accountUser.isPremium && !MiscSettingsManager.shared.shouldBypassCopyProtection {
                                 self.presentQualityUpgradeScreen()
                                 
                                 return
@@ -7422,10 +7422,11 @@ public final class StoryItemSetContainerComponent: Component {
                             }
                             self.beginPictureInPicture()
                         })))
-                    } else if !component.slice.item.storyItem.isForwardingDisabled {
+                    } else if !component.slice.item.storyItem.isForwardingDisabled || MiscSettingsManager.shared.shouldBypassCopyProtection {
                         let saveText: String = component.strings.Story_Context_SaveToGallery
+                        let canSave = accountUser.isPremium || MiscSettingsManager.shared.shouldBypassCopyProtection
                         items.append(.action(ContextMenuActionItem(text: saveText, icon: { theme in
-                            return generateTintedImage(image: UIImage(bundleImageName: accountUser.isPremium ? "Chat/Context Menu/Download" : "Chat/Context Menu/DownloadLocked"), color: theme.contextMenu.primaryColor)
+                            return generateTintedImage(image: UIImage(bundleImageName: canSave ? "Chat/Context Menu/Download" : "Chat/Context Menu/DownloadLocked"), color: theme.contextMenu.primaryColor)
                         }, action: { [weak self] _, a in
                             a(.default)
                             
@@ -7433,7 +7434,7 @@ public final class StoryItemSetContainerComponent: Component {
                                 return
                             }
                             
-                            if accountUser.isPremium {
+                            if canSave {
                                 self.requestSave()
                             } else {
                                 self.presentSaveUpgradeScreen()

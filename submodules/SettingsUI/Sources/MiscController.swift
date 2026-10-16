@@ -214,7 +214,7 @@ private func miscControllerEntries(presentationData: PresentationData, state: Mi
     entries.append(.featuresHeader(theme, "ФУНКЦИИ"))
     entries.append(.disableViewOnceAutoDelete(theme, "Многоразовый View-Once", state.disableViewOnceAutoDelete))
     entries.append(.bypassScreenshotProtection(theme, "Разрешить скриншоты", state.bypassScreenshotProtection))
-    entries.append(.bypassCopyProtection(theme, "Сохранение из закрытых каналов", state.bypassCopyProtection))
+    entries.append(.bypassCopyProtection(theme, "Пересылка и скачивание (каналы, истории)", state.bypassCopyProtection))
     entries.append(.blockAds(theme, "Блокировать рекламу", state.blockAds))
     entries.append(.alwaysOnline(theme, "Всегда в сети", state.alwaysOnline))
     

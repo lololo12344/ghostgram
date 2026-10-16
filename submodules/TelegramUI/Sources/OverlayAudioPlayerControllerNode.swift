@@ -509,10 +509,11 @@ final class OverlayAudioPlayerControllerNode: ViewControllerTracingNode, ASGestu
                     TelegramEngine.EngineData.Item.Peer.CopyProtectionEnabled(id: peerId),
                     TelegramEngine.EngineData.Item.Peer.MyCopyProtectionEnabled(id: peerId)
                 ) |> map { copyProtectionEnabled, myCopyProtectionEnabled in
-                    return copyProtectionEnabled || myCopyProtectionEnabled
+                    return (copyProtectionEnabled || myCopyProtectionEnabled) && !MiscSettingsManager.shared.shouldBypassCopyProtection
                 }
             } else {
                 copyProtectionEnabled = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.CopyProtectionEnabled(id: peerId))
+                |> map { $0 && !MiscSettingsManager.shared.shouldBypassCopyProtection }
             }
         } else {
             copyProtectionEnabled = .single(false)
@@ -794,7 +795,7 @@ final class OverlayAudioPlayerControllerNode: ViewControllerTracingNode, ASGestu
     }
     
     private var isSaved: Bool? {
-        if self .copyProtectionEnabled {
+        if self.copyProtectionEnabled && !MiscSettingsManager.shared.shouldBypassCopyProtection {
             return nil
         }
         if case let .peer(peerId) = self.chatLocation, peerId.namespace == Namespaces.Peer.SecretChat {

@@ -356,7 +356,7 @@ final class StoryItemContentComponent: Component {
                             useLargeThumbnail: false,
                             autoFetchFullSizeThumbnail: false,
                             tempFilePath: nil,
-                            captureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
+                            captureProtected: (MiscSettingsManager.shared.shouldBypassScreenshotProtection || MiscSettingsManager.shared.shouldBypassCopyProtection) ? false : component.item.isForwardingDisabled,
                             hintDimensions: file.dimensions?.cgSize,
                             storeAfterDownload: nil,
                             displayImage: false,
@@ -776,7 +776,7 @@ final class StoryItemContentComponent: Component {
                 availableReactions: component.availableReactions,
                 entityFiles: component.entityFiles,
                 size: size,
-                isCaptureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
+                isCaptureProtected: (MiscSettingsManager.shared.shouldBypassScreenshotProtection || MiscSettingsManager.shared.shouldBypassCopyProtection) ? false : component.item.isForwardingDisabled,
                 attemptSynchronous: synchronousLoad,
                 isActive: self.progressMode.mode == .play,
                 transition: transition
@@ -972,7 +972,7 @@ final class StoryItemContentComponent: Component {
                         storyId: component.item.id,
                         media: messageMedia,
                         size: availableSize,
-                        isCaptureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
+                        isCaptureProtected: (MiscSettingsManager.shared.shouldBypassScreenshotProtection || MiscSettingsManager.shared.shouldBypassCopyProtection) ? false : component.item.isForwardingDisabled,
                         attemptSynchronous: synchronousLoad,
                         transition: transition
                     )
@@ -1151,7 +1151,7 @@ final class StoryItemContentComponent: Component {
                         storyId: component.item.id,
                         media: messageMedia,
                         size: availableSize,
-                        isCaptureProtected: MiscSettingsManager.shared.shouldBypassScreenshotProtection ? false : component.item.isForwardingDisabled,
+                        isCaptureProtected: (MiscSettingsManager.shared.shouldBypassScreenshotProtection || MiscSettingsManager.shared.shouldBypassCopyProtection) ? false : component.item.isForwardingDisabled,
                         attemptSynchronous: synchronousLoad,
                         transition: transition
                     )

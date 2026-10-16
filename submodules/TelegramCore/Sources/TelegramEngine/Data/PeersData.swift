@@ -2359,6 +2359,9 @@ public extension TelegramEngine.EngineData.Item {
                 guard let peer = peerViewMainPeer(view) else {
                     return false
                 }
+                if MiscSettingsManager.shared.shouldBypassCopyProtection {
+                    return false
+                }
                 if let cachedPeerData = view.cachedData as? CachedUserData {
                     return cachedPeerData.flags.contains(.copyProtectionEnabled)
                 } else if let group = peer as? TelegramGroup {
@@ -2390,6 +2393,9 @@ public extension TelegramEngine.EngineData.Item {
             func extract(view: PostboxView) -> Result {
                 guard let view = view as? CachedPeerDataView else {
                     preconditionFailure()
+                }
+                if MiscSettingsManager.shared.shouldBypassCopyProtection {
+                    return false
                 }
                 if let cachedData = view.cachedPeerData as? CachedUserData {
                     return cachedData.flags.contains(.myCopyProtectionEnabled)

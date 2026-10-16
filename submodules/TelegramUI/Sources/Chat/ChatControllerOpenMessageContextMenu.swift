@@ -90,9 +90,9 @@ extension ChatControllerImpl {
                             break
                         }
                     }
-                    if self.presentationInterfaceState.myCopyProtectionEnabled && !isAction && !isAd {
+                    if !MiscSettingsManager.shared.shouldBypassCopyProtection && self.presentationInterfaceState.myCopyProtectionEnabled && !isAction && !isAd {
                         tip = .messageCopyProtection(text: self.presentationData.strings.Conversation_CopyProtectionInfoPrivateYou)
-                    } else if self.presentationInterfaceState.copyProtectionEnabled && !isAction && !isAd {
+                    } else if !MiscSettingsManager.shared.shouldBypassCopyProtection && self.presentationInterfaceState.copyProtectionEnabled && !isAction && !isAd {
                         if case .scheduledMessages = self.subject {
                         } else {
                             if let peer = self.presentationInterfaceState.renderedPeer?.peer {
